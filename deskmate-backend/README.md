@@ -268,5 +268,5 @@ git push
 
 ## Lisensi
 
-Project Capstone — PT. Indonesia Epson Industry × [Nama Institusi Kamu]  
+Project Capstone — Deskmate 
 Dibuat untuk keperluan akademik. Tidak untuk distribusi komersial.
