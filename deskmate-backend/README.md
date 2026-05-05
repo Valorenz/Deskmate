@@ -269,4 +269,5 @@ git push
 ## Lisensi
 
 Project Capstone — Deskmate 
+
 Dibuat untuk keperluan akademik. Tidak untuk distribusi komersial.
