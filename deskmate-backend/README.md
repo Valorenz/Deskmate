@@ -167,6 +167,15 @@ venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pip install asyncpg langchain-core langchain-text-splitters
 
+# Apabila Error pada saat menjalankan requirements.txt
+pip install fastapi uvicorn[standard] pydantic pydantic-settings
+pip install PyJWT passlib python-multipart
+pip install sqlalchemy asyncpg supabase
+pip install langchain langchain-google-genai langchain-chroma chromadb
+pip install langchain-core langchain-text-splitters
+pip install pypdf aiosmtplib python-dotenv httpx tenacity
+pip install psycopg2-binary
+
 # Jalankan server development
 uvicorn main:app --reload --port 8000
 ```
