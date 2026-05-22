@@ -72,10 +72,10 @@ class LLMService:
             temperature=0.2,      # Rendah = respons lebih konsisten & faktual
             max_output_tokens=2048,
             # Safety settings: matikan filter yang terlalu agresif untuk konteks industri
-            safety_settings={
-                "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
-                "HARM_CATEGORY_HARASSMENT": "BLOCK_MEDIUM_AND_ABOVE",
-            },
+            #safety_settings={
+             #   "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
+              #  "HARM_CATEGORY_HARASSMENT": "BLOCK_MEDIUM_AND_ABOVE",
+            #},
         )
         logger.info(f"LLMService initialized with model: {settings.GEMINI_MODEL}")
 
