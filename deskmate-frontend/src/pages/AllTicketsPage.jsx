@@ -1,8 +1,9 @@
 // src/pages/AllTicketsPage.jsx
 // -------------------------------------------------------
-// Supervisor / All Tickets Management DeskMate
-// Sesuai desain: filter chips, tabel dengan requester avatar,
-// status+priority inline badges, assignee, SLA indicator, kebab menu
+// Supervisor All Tickets Management Page
+// Koneksi Backend:
+// - GET /api/v1/profiles/me
+// - GET /api/v1/tickets/ (Paginated listing with filters)
 // -------------------------------------------------------
 
 import { useState, useEffect, useRef } from "react";
@@ -34,7 +35,6 @@ const SLA_STYLE = {
   met:       { label: "Met SLA",       color: "#15803D" },
 };
 
-// Fake SLA for display since backend doesn't have SLA field yet
 const fakeSLA = (ticket) => {
   if (ticket.priority === "critical" || ticket.priority === "high") return SLA_STYLE.due_soon;
   if (ticket.priority === "medium") return SLA_STYLE.due_tom;
@@ -62,8 +62,28 @@ export default function AllTicketsPage() {
   const [openMenu, setOpenMenu]     = useState(null);
   const PAGE_SIZE = 10;
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
+
+  const menuRef = useRef(null);
+
   useEffect(() => { loadProfile(); }, []);
   useEffect(() => { loadTickets(); }, [statusFilter, priorityFilter, page]);
+
+  // Click outside listener for dropdown
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenu(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   async function loadProfile() {
     const r = await apiFetch("/api/v1/profiles/me");
@@ -100,311 +120,436 @@ export default function AllTicketsPage() {
     const diff = Math.floor((Date.now() - new Date(d)) / 1000);
     if (diff < 60) return "Just now";
     if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff/3600)} hr${Math.floor(diff/3600)>1?"s":""} ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
     return `${Math.floor(diff/86400)}d ago`;
   };
 
-  const renderPages = () => {
-    const pages = [];
-    const show = 3;
-    let start = Math.max(1, page - 1);
-    let end = Math.min(totalPages, start + show - 1);
-    if (end - start < show - 1) start = Math.max(1, end - show + 1);
-    for (let i = start; i <= end; i++) pages.push(i);
-    return (
-      <div style={s.pagination}>
-        <span style={s.pageInfo}>Showing {Math.min((page-1)*PAGE_SIZE+1, total)} to {Math.min(page*PAGE_SIZE, total)} of {total} tickets</span>
-        <div style={s.pageButtons}>
-          <button style={s.pageNavBtn} onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}>← Previous</button>
-          {start > 1 && <><button style={s.pageBtn} onClick={() => setPage(1)}>1</button><span style={s.pageDots}>...</span></>}
-          {pages.map(p => (
-            <button key={p} style={{...s.pageBtn, ...(p===page?s.pageBtnActive:{})}} onClick={() => setPage(p)}>{p}</button>
-          ))}
-          {end < totalPages && <><span style={s.pageDots}>...</span><button style={s.pageBtn} onClick={() => setPage(totalPages)}>{totalPages}</button></>}
-          <button style={s.pageNavBtn} onClick={() => setPage(p => Math.min(totalPages,p+1))} disabled={page===totalPages}>Next →</button>
-        </div>
-      </div>
-    );
-  };
+  // ── FITUR CURSOR SPARKS (GEMINI STYLE EFFECT) ──
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (Math.random() > 0.25) return;
+
+      const spark = document.createElement('div');
+      spark.className = 'cursor-spark';
+
+      const size = Math.random() * 8 + 4;
+      spark.style.width = `${size}px`;
+      spark.style.height = `${size}px`;
+
+      spark.style.left = `${e.clientX}px`;
+      spark.style.top = `${e.clientY}px`;
+
+      const colors = [
+        'radial-gradient(circle, #8ab4f8 10%, rgba(138,180,248,0) 80%)',
+        'radial-gradient(circle, #c58af9 10%, rgba(197,138,249,0) 80%)',
+        'radial-gradient(circle, #f382ac 10%, rgba(243,130,172,0) 80%)',
+        'radial-gradient(circle, #a8dab5 10%, rgba(168,218,181,0) 80%)',
+      ];
+      spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+      const driftX = (Math.random() - 0.5) * 60;
+      const driftY = (Math.random() - 0.5) * 60;
+      spark.style.setProperty('--drift-x', `${driftX}px`);
+      spark.style.setProperty('--drift-y', `${driftY}px`);
+
+      document.body.appendChild(spark);
+
+      setTimeout(() => {
+        spark.remove();
+      }, 800);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
+  const fullName = profile?.full_name || getFullName() || "User";
 
   return (
-    <div style={s.root} onClick={() => setOpenMenu(null)}>
-      {/* ── SIDEBAR ── */}
-      <aside style={s.sidebar}>
-        <div style={s.sidebarLogo}>
-          <div style={s.logoIcon}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#2563EB"/>
+    <div className="flex h-screen w-full bg-[#f4f6fa] font-sans text-[#111827] overflow-hidden relative" onClick={() => setOpenMenu(null)}>
+      {/* ─── STYLE OVERRIDE FOR HELVETICA NEUE & CURSOR SPARKS ─── */}
+      <style>{`
+        * {
+          font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+        }
+        @keyframes spark-fade {
+          0% {
+            transform: translate(0, 0) scale(0) rotate(0deg);
+            opacity: 0;
+          }
+          15% {
+            transform: translate(0, 0) scale(1) rotate(45deg);
+            opacity: 0.95;
+          }
+          100% {
+            transform: translate(var(--drift-x), var(--drift-y)) scale(0) rotate(180deg);
+            opacity: 0;
+          }
+        }
+        .cursor-spark {
+          position: fixed;
+          pointer-events: none;
+          z-index: 9999;
+          mix-blend-mode: screen;
+          animation: spark-fade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          clip-path: polygon(50% 0%, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0% 50%, 37% 37%);
+        }
+      `}</style>
+
+      {/* ─── TOP HEADER (MATCHES CHATBOT HEADER) ─── */}
+      <header className="fixed top-0 left-0 right-0 flex h-14 md:h-16 items-center justify-between border-b border-[#d1d5db] bg-white px-3 md:px-6 shadow-sm z-30">
+        <div className="flex items-center gap-2 md:gap-4">
+          <button 
+            onClick={(e) => { e.stopPropagation(); setIsSidebarOpen(!isSidebarOpen); }} 
+            className="rounded-lg p-2 text-[#6b7280] hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center border-none bg-transparent cursor-pointer"
+          >
+            <svg className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
-          </div>
-          <span style={s.logoText}>DeskMate</span>
-        </div>
-        <nav style={s.nav}>
-          <NavItem icon="🏠" label="Supervisor Dashboard" onClick={() => navigate("/dashboard")} />
-          <NavItem icon="🤖" label="AI Chat Interface" onClick={() => navigate("/chat")} />
-          <NavItem icon="☰" label="Employee Ticket List" onClick={() => navigate("/tickets")} />
-          <NavItem icon="+" label="Create Ticket Form" onClick={() => navigate("/tickets/create")} />
-          <NavItem icon="🎫" label="All Tickets" active />
-          <div style={s.navSection}>ADMIN</div>
-          <NavItem icon="📄" label="Admin Document Management" onClick={() => navigate("/documents")} />
-          <NavItem icon="⚙" label="Admin User Management" onClick={() => navigate("/users")} />
-        </nav>
-        <div style={s.sidebarFooter} onClick={() => navigate("/profile")}>
-          <div style={s.avatarSmall}>{profile?.full_name?.charAt(0)?.toUpperCase() || "U"}</div>
-          <div>
-            <div style={s.footerName}>{profile?.full_name || getFullName() || "User"}</div>
-            <div style={s.footerSub}>Profile & Settings</div>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── MAIN ── */}
-      <main style={s.main}>
-        {/* Topbar */}
-        <div style={s.topbar}>
-          <h1 style={s.pageTitle}>All Tickets</h1>
-          <div style={s.topbarRight}>
-            <button style={s.bellBtn}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-            </button>
-            <button style={s.newTicketBtn} onClick={() => navigate("/tickets/create")}>+ New Ticket</button>
+          </button>
+          <div className="flex flex-col">
+            <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-[#003399] leading-none">EPSON</h1>
+            <span className="text-[9px] md:text-[10px] font-bold text-[#6b7280] tracking-wider mt-0.5">DESKMATE AI</span>
           </div>
         </div>
 
-        <div style={s.content}>
-          {/* Header */}
-          <div style={s.contentHeader}>
-            <div>
-              <h2 style={s.contentTitle}>Tickets Management</h2>
-              <p style={s.contentSub}>Manage and assign all incoming organizational tickets.</p>
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Search Button */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center border-none bg-transparent cursor-pointer">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+
+          {/* Settings Button */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center border-none bg-transparent cursor-pointer">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+
+          {/* Bell / Toggle Panel Button */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center border-none bg-transparent cursor-pointer">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </button>
+
+          <div className="h-6 w-px bg-gray-300 mx-1 md:mx-2 hidden sm:block"></div>
+          
+          <div onClick={() => navigate("/profile")} className="flex items-center gap-1 md:gap-2 pl-1 cursor-pointer hover:opacity-80 transition-opacity select-none">
+            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
+              {fullName.charAt(0).toUpperCase()}
             </div>
-            {/* Search + export */}
-            <div style={s.searchRow}>
-              <div style={s.searchWrap}>
-                <span style={s.searchIcon}>🔍</span>
-                <input
-                  type="text"
-                  placeholder="Search tickets..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  style={s.searchInput}
-                />
-              </div>
-              <button style={s.exportBtn} title="Export">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
+            <div className="hidden md:flex flex-col text-left">
+              <span className="text-xs font-bold text-[#111827]">{fullName}</span>
+              <span className="text-[10px] text-[#6b7280]">
+                {role === "admin" ? "Admin" : role === "supervisor" ? "Supervisor" : "Karyawan"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── MAIN LAYOUT CONTAINER ─── */}
+      <div className="flex flex-1 pt-14 md:pt-16 overflow-hidden relative w-full h-full">
+        {isSidebarOpen && (
+          <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+        )}
+
+        {/* ── SIDEBAR PANEL LEFT ── */}
+        <div className={`fixed md:relative inset-y-0 left-0 z-40 bg-[#f8fafd] border-r border-gray-200/80 flex flex-col transition-all duration-300 ease-in-out w-[280px] md:w-64 flex-shrink-0 ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:-ml-64 md:translate-x-0 md:opacity-100'}`}>
+          <div className="p-4 flex-1 overflow-y-auto relative">
+            <button onClick={() => navigate("/chat")} className="w-full rounded-full border border-[#d1d5db] bg-white text-[#111827] py-2.5 text-sm font-semibold transition hover:bg-gray-50 mb-6 shadow-sm">+ Chat Baru</button>
+            
+            <p className="text-xs font-bold text-[#9ca3af] mb-3 px-1 tracking-wider uppercase">Menu Navigasi</p>
+            <nav className="space-y-1 mb-6">
+              <button onClick={() => navigate("/dashboard")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Dashboard Utama</span>
+              </button>
+              <button onClick={() => navigate("/chat")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>AI Helpdesk Chat</span>
+              </button>
+              <button onClick={() => navigate("/tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Daftar Tiket Saya</span>
+              </button>
+              <button onClick={() => navigate("/tickets/create")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Buat Tiket Baru</span>
+              </button>
+
+              {/* Rute Khusus Supervisor */}
+              {(role === "supervisor" || role === "admin") && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Supervisor</p>
+                  <span className="flex items-center gap-3 bg-[#e5e7eb] text-[#111827] rounded-lg p-3 text-sm font-semibold cursor-default">
+                    <span>Semua Tiket Unit</span>
+                  </span>
+                </>
+              )}
+
+              {/* Rute Khusus Admin */}
+              {role === "admin" && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Admin</p>
+                  <button onClick={() => navigate("/documents")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Kelola Dokumen RAG</span>
+                  </button>
+                  <button onClick={() => navigate("/users")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Kelola Pengguna</span>
+                  </button>
+                </>
+              )}
+            </nav>
+          </div>
+          
+          <div className="p-4 border-t border-gray-200/80 flex items-center gap-3 cursor-pointer hover:bg-gray-100/50 transition-colors" onClick={() => navigate("/profile")}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs">
+              {fullName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-[#111827] truncate">{fullName}</div>
+              <div className="text-[10px] text-[#6b7280]">Profile & Settings</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── AREA UTAMA KONTEN (PREMIUM CORPORATE DECK) ── */}
+        <main className="flex-1 overflow-y-auto bg-[#f0f4f9] p-4 md:p-6 space-y-6">
+          
+          {/* Breadcrumbs */}
+          <div className="flex items-center justify-between text-xs text-gray-400">
+            <div className="flex items-center gap-1.5">
+              <span className="hover:text-[#124090] cursor-pointer" onClick={() => navigate("/dashboard")}>Home</span>
+              <span>/</span>
+              <span className="text-[#111827] font-semibold">All Tickets</span>
+            </div>
+            <div>
+              <button 
+                onClick={() => navigate("/tickets/create")}
+                className="bg-[#124090] hover:bg-[#0e306e] text-white text-xs font-bold px-4 py-2 rounded-xl transition duration-200 shadow-sm border-none cursor-pointer"
+              >
+                + New Ticket
               </button>
             </div>
           </div>
 
-          {/* Filter chips */}
-          <div style={s.filterBar}>
-            <div style={s.activeChip}>{total} Active Tickets</div>
-            <FilterDrop label="Status" options={STATUS_OPTIONS} value={statusFilter} onChange={v => { setStatus(v); setPage(1); }}
-              display={v => STATUS_STYLE[v]?.label || v} />
-            <FilterDrop label="Priority" options={PRIORITY_OPTIONS} value={priorityFilter} onChange={v => { setPriority(v); setPage(1); }}
-              display={v => PRIORITY_STYLE[v]?.label || v} />
-            <FilterDrop label="Department" options={["All", "IT & Network", "HR", "Facilities", "Finance"]} value="All" onChange={() => {}} display={v => v} />
-            <FilterDrop label="Assignee" options={["All", "Unassigned", "Mark J.", "Sarah C."]} value="All" onChange={() => {}} display={v => v} />
-            <button style={s.moreFiltersBtn}>▼ More Filters</button>
+          {/* Section Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <span className="text-[10px] font-extrabold text-[#124090] tracking-widest uppercase">Epson Ops Command</span>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mt-1">Semua Tiket Unit</h2>
+              <p className="text-xs text-[#6b7280] mt-0.5">Kelola, delegasikan teknisi, dan pantau SLA seluruh tiket organisasi.</p>
+            </div>
           </div>
 
-          {/* Table */}
-          <div style={s.tableCard}>
-            <table style={s.table}>
-              <thead>
-                <tr style={s.thead}>
-                  <th style={{...s.th, width: 36}}>
-                    <input type="checkbox" checked={selected.length===filtered.length&&filtered.length>0} onChange={toggleAll} style={s.checkbox}/>
-                  </th>
-                  <th style={s.th}>TICKET INFO</th>
-                  <th style={s.th}>REQUESTER</th>
-                  <th style={s.th}>STATUS & PRIORITY</th>
-                  <th style={s.th}>ASSIGNEE</th>
-                  <th style={s.th}>SLA / UPDATED</th>
-                  <th style={{...s.th, width: 36}}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={7} style={s.emptyCell}>
-                    <span style={s.spinner}/> Loading...
-                  </td></tr>
-                ) : filtered.length === 0 ? (
-                  <tr><td colSpan={7} style={s.emptyCell}>No tickets found.</td></tr>
-                ) : filtered.map(ticket => {
-                  const st  = STATUS_STYLE[ticket.status] || STATUS_STYLE.open;
-                  const pr  = PRIORITY_STYLE[ticket.priority] || PRIORITY_STYLE.medium;
-                  const sla = fakeSLA(ticket);
-                  const isSelected = selected.includes(ticket.id);
-                  const reqName = ticket.creator?.full_name || "Unknown";
-                  const assigneeName = ticket.assignee?.full_name;
-                  return (
-                    <tr key={ticket.id} style={{...s.tr, background: isSelected ? "#F0F7FF" : "#FFFFFF"}}
-                      onClick={() => navigate(`/tickets/${ticket.id}`)}>
-                      <td style={s.td} onClick={e => { e.stopPropagation(); setSelected(p => p.includes(ticket.id) ? p.filter(x=>x!==ticket.id) : [...p, ticket.id]); }}>
-                        <input type="checkbox" checked={isSelected} onChange={()=>{}} style={s.checkbox}/>
-                      </td>
-                      {/* Ticket info */}
-                      <td style={s.td}>
-                        <div style={s.ticketTitle}>{ticket.title}</div>
-                        <div style={s.ticketMeta}>#{ticket.ticket_number} • {ticket.category || "General"}</div>
-                      </td>
-                      {/* Requester */}
-                      <td style={s.td}>
-                        <div style={s.requesterCell}>
-                          <div style={{...s.reqAvatar, background: avatarColor(reqName)}}>{reqName.charAt(0).toUpperCase()}</div>
-                          <span style={s.reqName}>{reqName}</span>
+          {/* Filter Bar Row */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="bg-[#124090] text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm shrink-0">
+              {total} Active Tickets
+            </div>
+
+            <div className="relative">
+              <select 
+                value={statusFilter} 
+                onChange={e => { setStatus(e.target.value); setPage(1); }} 
+                className="bg-white border border-gray-200 rounded-xl px-3.5 py-1.5 pr-7 text-xs text-slate-700 outline-none cursor-pointer appearance-none font-medium"
+              >
+                {STATUS_OPTIONS.map(o => (
+                  <option key={o} value={o}>Status: {STATUS_STYLE[o]?.label || o}</option>
+                ))}
+              </select>
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">▼</span>
+            </div>
+
+            <div className="relative">
+              <select 
+                value={priorityFilter} 
+                onChange={e => { setPriority(e.target.value); setPage(1); }} 
+                className="bg-white border border-gray-200 rounded-xl px-3.5 py-1.5 pr-7 text-xs text-slate-700 outline-none cursor-pointer appearance-none font-medium"
+              >
+                {PRIORITY_OPTIONS.map(o => (
+                  <option key={o} value={o}>Priority: {o.toUpperCase()}</option>
+                ))}
+              </select>
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">▼</span>
+            </div>
+          </div>
+
+          {/* Table Container Card (Corporate Deck Style) */}
+          <div className="bg-white border border-gray-200/60 rounded-2xl shadow-sm overflow-hidden">
+            
+            {/* Search toolbar */}
+            <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5 bg-slate-50 border border-gray-200 rounded-xl px-3.5 py-2 flex-1 max-w-md w-full">
+                <svg className="h-4 w-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search tickets by subject, description or ID..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="bg-transparent border-none outline-none text-xs text-slate-700 w-full placeholder-gray-400"
+                />
+              </div>
+            </div>
+
+            {/* Table Listing */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50">
+                    <th className="p-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 w-10">
+                      <input 
+                        type="checkbox" 
+                        checked={selected.length === filtered.length && filtered.length > 0} 
+                        onChange={toggleAll} 
+                        className="w-3.5 h-3.5 accent-[#124090] cursor-pointer"
+                      />
+                    </th>
+                    <th className="p-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Ticket Info</th>
+                    <th className="p-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 w-44">Requester</th>
+                    <th className="p-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 w-52">Status & Priority</th>
+                    <th className="p-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 w-44">Assignee</th>
+                    <th className="p-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 w-40">SLA / Updated</th>
+                    <th className="p-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 w-10"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center text-xs text-gray-400 font-medium">
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="h-4 w-4 border-2 border-gray-300 border-t-[#124090] rounded-full animate-spin"></div>
+                          Loading tickets...
                         </div>
-                      </td>
-                      {/* Status & Priority */}
-                      <td style={s.td}>
-                        <div style={s.statusPriorityCell}>
-                          <span style={{...s.badge, background: st.bg, color: st.color}}>{st.label} ▾</span>
-                          <span style={{...s.badge, background: pr.bg, color: pr.color}}>{pr.label}</span>
-                        </div>
-                      </td>
-                      {/* Assignee */}
-                      <td style={s.td}>
-                        {assigneeName ? (
-                          <div style={s.assigneeCell}>
-                            <div style={{...s.assignAvatar, background: avatarColor(assigneeName)}}>{assigneeName.charAt(0).toUpperCase()}</div>
-                            <span style={s.assignName}>{assigneeName.split(" ")[0]} {assigneeName.split(" ")[1]?.charAt(0)}.</span>
-                          </div>
-                        ) : (
-                          <span style={s.unassigned}>👤 Unassigned</span>
-                        )}
-                      </td>
-                      {/* SLA / Updated */}
-                      <td style={s.td}>
-                        <div style={{...s.slaText, color: sla.color, fontWeight: sla.bold ? 700 : 400}}>{sla.label}</div>
-                        <div style={s.updatedText}>{timeAgo(ticket.updated_at || ticket.created_at)}</div>
-                      </td>
-                      {/* Kebab menu */}
-                      <td style={s.td} onClick={e => { e.stopPropagation(); setOpenMenu(openMenu === ticket.id ? null : ticket.id); }}>
-                        <button style={s.kebabBtn}>⋮</button>
-                        {openMenu === ticket.id && (
-                          <div style={s.dropdown}>
-                            <button style={s.dropItem} onClick={() => navigate(`/tickets/${ticket.id}`)}>👁 View</button>
-                            <button style={s.dropItem}>👤 Assign</button>
-                            <button style={s.dropItem}>🔄 Change Status</button>
-                            <div style={s.dropDivider}/>
-                            <button style={{...s.dropItem, color: "#DC2626"}}>🗑 Close Ticket</button>
-                          </div>
-                        )}
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {!loading && total > 0 && renderPages()}
+                  ) : filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center text-xs text-gray-400 italic">
+                        No tickets found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map(ticket => {
+                      const st  = STATUS_STYLE[ticket.status] || STATUS_STYLE.open;
+                      const pr  = PRIORITY_STYLE[ticket.priority] || PRIORITY_STYLE.medium;
+                      const sla = fakeSLA(ticket);
+                      const isSelected = selected.includes(ticket.id);
+                      const reqName = ticket.creator?.full_name || "Unknown";
+                      const assigneeName = ticket.assignee?.full_name;
+                      return (
+                        <tr 
+                          key={ticket.id} 
+                          className={`hover:bg-slate-50/40 transition cursor-pointer ${isSelected ? 'bg-blue-50/20' : ''}`}
+                          onClick={() => navigate(`/tickets/${ticket.id}`)}
+                        >
+                          <td className="p-3.5" onClick={e => { e.stopPropagation(); setSelected(p => p.includes(ticket.id) ? p.filter(x=>x!==ticket.id) : [...p, ticket.id]); }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected} 
+                              onChange={() => {}} 
+                              className="w-3.5 h-3.5 accent-[#124090] cursor-pointer"
+                            />
+                          </td>
+                          <td className="p-3.5 min-w-[200px]">
+                            <div className="text-xs font-bold text-slate-800">{ticket.title}</div>
+                            <div className="text-[10px] text-gray-400 mt-0.5 font-medium">#{ticket.ticket_number} • {ticket.category || "General"}</div>
+                          </td>
+                          <td className="p-3.5">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full text-white flex items-center justify-center font-bold text-[10px]" style={{ background: avatarColor(reqName) }}>
+                                {reqName.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-xs text-slate-700 font-bold truncate max-w-[120px]">{reqName}</span>
+                            </div>
+                          </td>
+                          <td className="p-3.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-md" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-md" style={{ background: pr.bg, color: pr.color }}>{pr.label}</span>
+                            </div>
+                          </td>
+                          <td className="p-3.5">
+                            {assigneeName ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-full text-white flex items-center justify-center font-bold text-[9px]" style={{ background: avatarColor(assigneeName) }}>
+                                  {assigneeName.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="text-xs text-slate-700 font-bold truncate max-w-[120px]">{assigneeName}</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 italic">Unassigned</span>
+                            )}
+                          </td>
+                          <td className="p-3.5">
+                            <div className="text-xs font-semibold" style={{ color: sla.color }}>{sla.label}</div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">{timeAgo(ticket.updated_at || ticket.created_at)}</div>
+                          </td>
+                          <td className="p-3.5 relative" onClick={e => { e.stopPropagation(); setOpenMenu(openMenu === ticket.id ? null : ticket.id); }}>
+                            <button className="text-gray-400 hover:text-slate-800 transition font-bold p-1">⋮</button>
+                            {openMenu === ticket.id && (
+                              <div ref={menuRef} className="absolute right-2.5 top-9 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 w-40 z-50 text-left">
+                                <button onClick={() => navigate(`/tickets/${ticket.id}`)} className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 border-none bg-transparent cursor-pointer">View Details</button>
+                                <button className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 border-none bg-transparent cursor-pointer">Assign to Me</button>
+                                <button className="w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 border-t border-gray-100 border-none bg-transparent cursor-pointer">Close Ticket</button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination controls */}
+            {!loading && total > 0 && (
+              <div className="p-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400 font-medium select-none">
+                <span>Showing {Math.min((page-1)*PAGE_SIZE+1, total)} to {Math.min(page*PAGE_SIZE, total)} of {total} tickets</span>
+                <div className="flex items-center gap-1.5">
+                  <button 
+                    onClick={() => setPage(p => Math.max(1,p-1))} 
+                    disabled={page===1}
+                    className="h-7 px-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-slate-600 disabled:opacity-40 transition cursor-pointer flex items-center justify-center font-bold"
+                  >
+                    ◄
+                  </button>
+                  {page > 2 && (
+                    <>
+                      <button onClick={() => setPage(1)} className="h-7 w-7 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-slate-600 cursor-pointer flex items-center justify-center font-bold">1</button>
+                      <span className="px-1">...</span>
+                    </>
+                  )}
+                  <span className="h-7 w-7 bg-[#124090] text-white border border-[#124090] rounded-lg flex items-center justify-center font-bold">
+                    {page}
+                  </span>
+                  {page < totalPages && (
+                    <>
+                      <span className="px-1">...</span>
+                      <button onClick={() => setPage(totalPages)} className="h-7 w-7 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-slate-600 cursor-pointer flex items-center justify-center font-bold">{totalPages}</button>
+                    </>
+                  )}
+                  <button 
+                    onClick={() => setPage(p => Math.min(totalPages,p+1))} 
+                    disabled={page===totalPages}
+                    className="h-7 px-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-slate-600 disabled:opacity-40 transition cursor-pointer flex items-center justify-center font-bold"
+                  >
+                    ►
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
-        </div>
-      </main>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} tr:hover td{background:#F9FAFB}`}</style>
-    </div>
-  );
-}
 
-// ── Sub Components ──────────────────────────────────────
-function NavItem({ icon, label, active, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button style={{...s.navItem, background: active?"#EFF6FF":hovered?"#F9FAFB":"transparent", color: active?"#2563EB":"#374151", fontWeight: active?600:400}}
-      onClick={onClick} onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}>
-      <span style={s.navIcon}>{icon}</span>
-      <span style={s.navLabel}>{label}</span>
-    </button>
-  );
-}
-
-function FilterDrop({ label, options, value, onChange, display }) {
-  return (
-    <div style={s.filterWrap}>
-      <select value={value} onChange={e => onChange(e.target.value)} style={s.filterSelect}>
-        {options.map(o => <option key={o} value={o}>{value !== "All" && o === value ? display(o) : `${label}${value !== "All" && o === "All" ? "" : ""}`}{o === "All" ? `: All` : ` ▾`}{o !== "All" && o === value ? "" : ""}</option>)}
-        {/* Simpler approach */}
-      </select>
-      <div style={s.filterChip}>
-        {label}{value !== "All" ? `: ${display(value)}` : ""} <span style={{fontSize:9}}>▾</span>
+        </main>
       </div>
     </div>
   );
 }
-
-// ── Styles ──────────────────────────────────────────────
-const s = {
-  root: { display: "flex", minHeight: "100vh", background: "#F3F4F6", fontFamily: "'DM Sans','Segoe UI',sans-serif", position: "relative" },
-  sidebar: { width: 200, background: "#FFFFFF", borderRight: "1px solid #E5E7EB", display: "flex", flexDirection: "column", flexShrink: 0 },
-  sidebarLogo: { display: "flex", alignItems: "center", gap: 10, padding: "18px 16px", borderBottom: "1px solid #F3F4F6" },
-  logoIcon: { width: 32, height: 32, background: "#EFF6FF", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" },
-  logoText: { fontSize: 15, fontWeight: 700, color: "#111827" },
-  nav: { flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 },
-  navSection: { fontSize: 10, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.08em", padding: "12px 8px 4px", textTransform: "uppercase" },
-  navItem: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", width: "100%", transition: "background 0.12s" },
-  navIcon: { fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 },
-  navLabel: { fontSize: 13, lineHeight: 1.3 },
-  sidebarFooter: { padding: "12px 14px", borderTop: "1px solid #F3F4F6", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
-  avatarSmall: { width: 32, height: 32, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 },
-  footerName: { fontSize: 13, fontWeight: 600, color: "#111827" },
-  footerSub: { fontSize: 11, color: "#9CA3AF" },
-  main: { flex: 1, display: "flex", flexDirection: "column", overflow: "auto" },
-  topbar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", background: "#FFFFFF", borderBottom: "1px solid #E5E7EB" },
-  pageTitle: { fontSize: 18, fontWeight: 700, color: "#111827", margin: 0 },
-  topbarRight: { display: "flex", alignItems: "center", gap: 10 },
-  bellBtn: { background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 8, display: "flex" },
-  newTicketBtn: { background: "#2563EB", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" },
-  content: { padding: "20px 24px", flex: 1, display: "flex", flexDirection: "column", gap: 14 },
-  contentHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 },
-  contentTitle: { fontSize: 18, fontWeight: 700, color: "#111827", margin: "0 0 4px" },
-  contentSub: { fontSize: 13, color: "#6B7280", margin: 0 },
-  searchRow: { display: "flex", gap: 8, alignItems: "center" },
-  searchWrap: { display: "flex", alignItems: "center", gap: 8, background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 8, padding: "7px 12px", minWidth: 200 },
-  searchIcon: { fontSize: 13 },
-  searchInput: { border: "none", background: "transparent", outline: "none", fontSize: 13, color: "#374151", fontFamily: "inherit", width: 160 },
-  exportBtn: { background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 8, padding: "7px 10px", cursor: "pointer", display: "flex", alignItems: "center" },
-  filterBar: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  activeChip: { background: "#2563EB", color: "#fff", fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 20 },
-  filterWrap: { position: "relative" },
-  filterSelect: { position: "absolute", inset: 0, opacity: 0, cursor: "pointer", zIndex: 1 },
-  filterChip: { background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 20, fontSize: 12, color: "#374151", padding: "5px 12px", cursor: "pointer", whiteSpace: "nowrap" },
-  moreFiltersBtn: { background: "none", border: "none", fontSize: 12, color: "#6B7280", cursor: "pointer", padding: "5px 8px" },
-  tableCard: { background: "#FFFFFF", borderRadius: 12, border: "1px solid #E5E7EB", overflow: "hidden" },
-  table: { width: "100%", borderCollapse: "collapse" },
-  thead: { background: "#F9FAFB" },
-  th: { padding: "10px 14px", fontSize: 11, fontWeight: 700, color: "#6B7280", textAlign: "left", letterSpacing: "0.05em", borderBottom: "1px solid #F3F4F6", whiteSpace: "nowrap" },
-  tr: { borderBottom: "1px solid #F9FAFB", cursor: "pointer", transition: "background 0.1s" },
-  td: { padding: "12px 14px", verticalAlign: "middle", position: "relative" },
-  checkbox: { width: 14, height: 14, accentColor: "#2563EB", cursor: "pointer" },
-  ticketTitle: { fontSize: 13, fontWeight: 600, color: "#111827", marginBottom: 3 },
-  ticketMeta: { fontSize: 11, color: "#9CA3AF" },
-  requesterCell: { display: "flex", alignItems: "center", gap: 7 },
-  reqAvatar: { width: 26, height: 26, borderRadius: "50%", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 },
-  reqName: { fontSize: 13, color: "#374151" },
-  statusPriorityCell: { display: "flex", gap: 6, flexWrap: "wrap" },
-  badge: { fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, cursor: "pointer" },
-  assigneeCell: { display: "flex", alignItems: "center", gap: 7 },
-  assignAvatar: { width: 24, height: 24, borderRadius: "50%", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 },
-  assignName: { fontSize: 12, color: "#374151" },
-  unassigned: { fontSize: 12, color: "#9CA3AF" },
-  slaText: { fontSize: 12, fontWeight: 600, marginBottom: 2 },
-  updatedText: { fontSize: 11, color: "#9CA3AF" },
-  kebabBtn: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#6B7280", padding: "0 4px", lineHeight: 1 },
-  dropdown: { position: "absolute", right: 8, top: "100%", background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 100, minWidth: 160, overflow: "hidden" },
-  dropItem: { display: "block", width: "100%", padding: "8px 14px", border: "none", background: "transparent", fontSize: 13, color: "#374151", cursor: "pointer", textAlign: "left", fontFamily: "inherit" },
-  dropDivider: { height: 1, background: "#F3F4F6" },
-  emptyCell: { padding: "32px 20px", textAlign: "center", color: "#9CA3AF", fontSize: 13 },
-  spinner: { display: "inline-block", width: 14, height: 14, border: "2px solid #E5E7EB", borderTopColor: "#2563EB", borderRadius: "50%", animation: "spin 0.6s linear infinite", marginRight: 8 },
-  pagination: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: "1px solid #F3F4F6", flexWrap: "wrap", gap: 8 },
-  pageInfo: { fontSize: 12, color: "#6B7280" },
-  pageButtons: { display: "flex", gap: 4, alignItems: "center" },
-  pageNavBtn: { padding: "5px 12px", border: "1px solid #E5E7EB", background: "#FFFFFF", borderRadius: 6, fontSize: 12, color: "#374151", cursor: "pointer", fontFamily: "inherit" },
-  pageBtn: { minWidth: 30, height: 30, border: "1px solid #E5E7EB", background: "#FFFFFF", borderRadius: 6, fontSize: 13, color: "#374151", cursor: "pointer", fontFamily: "inherit" },
-  pageBtnActive: { background: "#2563EB", color: "#FFFFFF", borderColor: "#2563EB" },
-  pageDots: { fontSize: 13, color: "#9CA3AF", padding: "0 4px" },
-};

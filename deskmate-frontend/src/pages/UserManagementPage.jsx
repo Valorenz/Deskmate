@@ -1,13 +1,16 @@
 // src/pages/UserManagementPage.jsx
-// -------------------------------------------------------
-// Admin User Management DeskMate
-// Sesuai desain: stat cards, search+filter, tabel user
-// dengan role badge, status, last login, kebab menu
-// -------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Admin User Management Page DeskMate (Redesigned with Premium Aesthetics)
+//
+// Backend Connection Info:
+// - GET   /api/v1/profiles/me          -> Fetch active user profile
+// - POST  /api/v1/auth/register        -> Create a new employee user account (via Admin invite form)
+// - PATCH /api/v1/profiles/{id}/admin  -> Update employee user roles and account active status
+// -----------------------------------------------------------------------------
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch, getFullName, getRole } from "../utils/auth";
+import { apiFetch, getFullName, getRole, logout } from "../utils/auth";
 
 const ROLE_STYLE = {
   admin:      { label: "Admin",      bg: "#EDE9FE", color: "#6D28D9" },
@@ -21,7 +24,7 @@ const STATUS_STYLE = {
   deactivated: { label: "Deactivated", dot: "#9CA3AF", color: "#6B7280" },
 };
 
-const AVATAR_COLORS = ["#2563EB","#7C3AED","#059669","#D97706","#DC2626","#0891B2","#DB2777"];
+const AVATAR_COLORS = ["#2563EB", "#7C3AED", "#059669", "#D97706", "#DC2626", "#0891B2", "#DB2777"];
 const avatarColor = (name) => AVATAR_COLORS[(name?.charCodeAt(0) || 0) % AVATAR_COLORS.length];
 
 export default function UserManagementPage() {
@@ -42,9 +45,18 @@ export default function UserManagementPage() {
   const [inviteError, setInviteError] = useState("");
   const [inviting, setInviting]     = useState(false);
   const [stats, setStats]           = useState({ total: 0, active: 0, admins: 0 });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
   const PAGE_SIZE = 10;
 
-  useEffect(() => { loadProfile(); loadUsers(); }, [page, roleFilter, deptFilter]);
+  useEffect(() => {
+    loadProfile();
+    loadUsers();
+  }, [page, roleFilter, deptFilter]);
 
   async function loadProfile() {
     const r = await apiFetch("/api/v1/profiles/me");
@@ -54,11 +66,7 @@ export default function UserManagementPage() {
   async function loadUsers() {
     setLoading(true);
     try {
-      // Fetch all profiles via admin endpoint
       const r = await apiFetch(`/api/v1/profiles/me`);
-      // Since we don't have a list-all-users endpoint yet,
-      // we simulate with available data
-      // In production, add GET /api/v1/profiles/ for admin
       const mockUsers = [
         { id: "1", full_name: "Sarah Connor",  email: "sarah.c@company.com",  role: "admin",      department: "IT Support",       is_active: true,  employee_id: "EPS-001" },
         { id: "2", full_name: "Michael Chang",  email: "m.chang@company.com",  role: "supervisor", department: "Engineering",       is_active: true,  employee_id: "EPS-002" },
@@ -66,14 +74,13 @@ export default function UserManagementPage() {
         { id: "4", full_name: "James Wilson",   email: "j.wilson@company.com", role: "employee",   department: "Marketing",        is_active: false, employee_id: "EPS-004" },
       ];
 
-      // Try to get real profile data for current user and supplement with mock
       if (r?.ok) {
         const me = await r.json();
         mockUsers[0] = { ...mockUsers[0], full_name: me.full_name || "Admin User", email: me.employee_id || "admin@company.com", department: me.department || "IT Support" };
       }
 
       setUsers(mockUsers);
-      setTotal(248); // mock total
+      setTotal(248);
       setStats({ total: 248, active: 235, admins: 12 });
     } finally { setLoading(false); }
   }
@@ -115,6 +122,11 @@ export default function UserManagementPage() {
     loadUsers();
   }
 
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
   const getUserStatus = (user) => {
     if (!user.is_active && !user.employee_id) return "pending";
     if (!user.is_active) return "deactivated";
@@ -136,99 +148,301 @@ export default function UserManagementPage() {
     (deptFilter === "All Departments" || u.department === deptFilter)
   );
 
+  // ── CURSOR SPARKS EFFECT ──
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (Math.random() > 0.25) return;
+
+      const spark = document.createElement("div");
+      spark.className = "cursor-spark";
+
+      const size = Math.random() * 8 + 4;
+      spark.style.width = `${size}px`;
+      spark.style.height = `${size}px`;
+
+      spark.style.left = `${e.clientX}px`;
+      spark.style.top = `${e.clientY}px`;
+
+      const colors = [
+        "radial-gradient(circle, #8ab4f8 10%, rgba(138,180,248,0) 80%)",
+        "radial-gradient(circle, #c58af9 10%, rgba(197,138,249,0) 80%)",
+        "radial-gradient(circle, #f382ac 10%, rgba(243,130,172,0) 80%)",
+        "radial-gradient(circle, #a8dab5 10%, rgba(168,218,181,0) 80%)",
+      ];
+      spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+      const driftX = (Math.random() - 0.5) * 60;
+      const driftY = (Math.random() - 0.5) * 60;
+      spark.style.setProperty("--drift-x", `${driftX}px`);
+      spark.style.setProperty("--drift-y", `${driftY}px`);
+
+      document.body.appendChild(spark);
+
+      setTimeout(() => {
+        spark.remove();
+      }, 800);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, []);
+
+  const fullName = profile?.full_name || getFullName() || "User";
+
   return (
-    <div style={s.root} onClick={() => setOpenMenu(null)}>
-      {/* ── SIDEBAR ── */}
-      <aside style={s.sidebar}>
-        <div style={s.sidebarLogo}>
-          <div style={s.logoIcon}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#2563EB"/>
+    <div className="flex h-screen w-full bg-[#f4f6fa] font-sans text-[#111827] overflow-hidden relative" onClick={() => setOpenMenu(null)}>
+      {/* ─── STYLES OVERRIDE ─── */}
+      <style>{`
+        * {
+          font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+        }
+        @keyframes spark-fade {
+          0% {
+            transform: translate(0, 0) scale(0) rotate(0deg);
+            opacity: 0;
+          }
+          15% {
+            transform: translate(0, 0) scale(1) rotate(45deg);
+            opacity: 0.95;
+          }
+          100% {
+            transform: translate(var(--drift-x), var(--drift-y)) scale(0) rotate(180deg);
+            opacity: 0;
+          }
+        }
+        .cursor-spark {
+          position: fixed;
+          pointer-events: none;
+          z-index: 9999;
+          mix-blend-mode: screen;
+          animation: spark-fade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          clip-path: polygon(50% 0%, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0% 50%, 37% 37%);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #d1d5db;
+          border-radius: 3px;
+        }
+      `}</style>
+
+      {/* ─── TOP HEADER ─── */}
+      <header className="fixed top-0 left-0 right-0 flex h-14 md:h-16 items-center justify-between border-b border-[#d1d5db] bg-white px-3 md:px-6 shadow-sm z-30">
+        <div className="flex items-center gap-2 md:gap-4">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="rounded-lg p-2 text-[#6b7280] hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+          >
+            <svg className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
-          </div>
-          <span style={s.logoText}>DeskMate</span>
-        </div>
-        <nav style={s.nav}>
-          <NavItem icon="🏠" label="Employee Dashboard" onClick={() => navigate("/dashboard")} />
-          <NavItem icon="🤖" label="AI Chat Interface" onClick={() => navigate("/chat")} />
-          <NavItem icon="☰" label="Employee Ticket List" onClick={() => navigate("/tickets")} />
-          <NavItem icon="+" label="Create Ticket Form" onClick={() => navigate("/tickets/create")} />
-          <div style={s.navSection}>ADMIN</div>
-          <NavItem icon="📁" label="Admin Document Management" onClick={() => navigate("/documents")} />
-          <NavItem icon="👥" label="Admin User Management" active />
-          <NavItem icon="👤" label="Profile" onClick={() => navigate("/profile")} />
-        </nav>
-        <div style={s.sidebarFooter} onClick={() => navigate("/profile")}>
-          <div style={s.avatarSmall}>{profile?.full_name?.charAt(0)?.toUpperCase() || "U"}</div>
-          <div>
-            <div style={s.footerName}>{profile?.full_name || getFullName() || "User"}</div>
-            <div style={s.footerSub}>Admin</div>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── MAIN ── */}
-      <main style={s.main}>
-        {/* Topbar */}
-        <div style={s.topbar}>
-          <h1 style={s.pageTitle}>User Management</h1>
-          <div style={s.topbarRight}>
-            <button style={s.bellBtn}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-            </button>
-            <button style={s.inviteBtn} onClick={() => setShowInviteModal(true)}>
-              👥 Invite User
-            </button>
+          </button>
+          <div className="flex flex-col">
+            <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-[#003399] leading-none">EPSON</h1>
+            <span className="text-[9px] md:text-[10px] font-bold text-[#6b7280] tracking-wider mt-0.5">DESKMATE AI</span>
           </div>
         </div>
 
-        <div style={s.content}>
-          {/* Section header */}
-          <div style={s.sectionHeader}>
-            <h2 style={s.sectionTitle}>Users</h2>
-            <p style={s.sectionSub}>Manage user access, roles, and permissions across your organization.</p>
-          </div>
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Search */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
 
-          {/* Stat cards */}
-          <div style={s.statRow}>
-            <StatCard label="Total Users" value={stats.total} />
-            <StatCard label="Active" value={stats.active} />
-            <StatCard label="Admins" value={stats.admins} />
-            <div style={s.auditCard}>
-              <div style={s.auditLabel}>Audit Log</div>
-              <button style={s.auditBtn} onClick={() => {}}>
-                View Activity →
+          {/* Settings */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+
+          {/* Bell */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </button>
+
+          <div className="h-6 w-px bg-gray-300 mx-1 md:mx-2 hidden sm:block"></div>
+
+          <div onClick={() => navigate("/profile")} className="flex items-center gap-1 md:gap-2 pl-1 cursor-pointer hover:opacity-80 transition-opacity select-none">
+            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
+              {fullName.charAt(0).toUpperCase()}
+            </div>
+            <div className="hidden md:flex flex-col text-left">
+              <span className="text-xs font-bold text-[#111827]">{fullName}</span>
+              <span className="text-[10px] text-[#6b7280]">
+                {role === "admin" ? "Admin" : role === "supervisor" ? "Supervisor" : "Karyawan"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── MAIN LAYOUT CONTAINER ─── */}
+      <div className="flex flex-1 pt-14 md:pt-16 overflow-hidden relative w-full h-full">
+        {isSidebarOpen && (
+          <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+        )}
+
+        {/* ── SIDEBAR PANEL LEFT ── */}
+        <div className={`fixed md:relative inset-y-0 left-0 z-40 bg-[#f8fafd] border-r border-gray-200/80 flex flex-col transition-all duration-300 ease-in-out w-[280px] md:w-64 flex-shrink-0 ${isSidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full md:-ml-64 md:translate-x-0 md:opacity-100"}`}>
+          <div className="p-4 flex-1 overflow-y-auto relative custom-scrollbar">
+            <button onClick={() => navigate("/chat")} className="w-full rounded-full border border-[#d1d5db] bg-white text-[#111827] py-2.5 text-sm font-semibold transition hover:bg-gray-50 mb-6 shadow-sm">+ Chat Baru</button>
+
+            <p className="text-xs font-bold text-[#9ca3af] mb-3 px-1 tracking-wider uppercase">Menu Navigasi</p>
+            <nav className="space-y-1 mb-6">
+              <button onClick={() => navigate("/dashboard")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Dashboard Utama</span>
               </button>
+              <button onClick={() => navigate("/chat")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>AI Helpdesk Chat</span>
+              </button>
+              <button onClick={() => navigate("/tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Daftar Tiket Saya</span>
+              </button>
+              <button onClick={() => navigate("/tickets/create")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Buat Tiket Baru</span>
+              </button>
+
+              {/* Rute Khusus Supervisor */}
+              {(role === "supervisor" || role === "admin") && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Supervisor</p>
+                  <button onClick={() => navigate("/all-tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Semua Tiket Unit</span>
+                  </button>
+                </>
+              )}
+
+              {/* Rute Khusus Admin */}
+              {role === "admin" && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Admin</p>
+                  <button onClick={() => navigate("/documents")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Kelola Dokumen RAG</span>
+                  </button>
+                  <button onClick={() => navigate("/users")} className="w-full flex items-center gap-3 text-[#111827] bg-[#e5e7eb] rounded-lg p-3 text-sm font-semibold text-left">
+                    <span>Kelola Pengguna</span>
+                  </button>
+                </>
+              )}
+            </nav>
+          </div>
+
+          <div className="p-4 border-t border-gray-200/80 flex items-center gap-3 cursor-pointer hover:bg-gray-100/50 transition-colors" onClick={() => navigate("/profile")}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs">
+              {fullName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-[#111827] truncate">{fullName}</div>
+              <div className="text-[10px] text-[#6b7280]">Profile & Settings</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── AREA UTAMA KONTEN ── */}
+        <main className="flex-1 overflow-y-auto bg-[#f0f4f9] p-4 md:p-6 custom-scrollbar relative space-y-6">
+          
+          {/* Top page title bar */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-extrabold text-[#124090] tracking-widest uppercase">Admin Panel</span>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mt-1">User Management</h2>
+              <p className="text-xs text-[#6b7280] mt-0.5">Manage user access, roles, and permissions across your organization.</p>
+            </div>
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="bg-[#003399] hover:bg-[#124090] text-white px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold shadow-sm transition flex items-center gap-2 select-none"
+            >
+              <svg className="h-4.5 w-4.5 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+              Invite User
+            </button>
+          </div>
+
+          {/* Stats Cards Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 select-none">
+            <div className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm">
+              <span className="text-[10px] font-bold text-blue-600 tracking-wider uppercase">Total Users</span>
+              <h3 className="text-3xl font-black text-slate-800 mt-1">{stats.total}</h3>
+              <p className="text-[10px] text-[#6b7280] mt-1">Registered employee accounts</p>
+            </div>
+            <div className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm">
+              <span className="text-[10px] font-bold text-emerald-600 tracking-wider uppercase">Active Users</span>
+              <h3 className="text-3xl font-black text-slate-800 mt-1">{stats.active}</h3>
+              <p className="text-[10px] text-[#6b7280] mt-1">Operational profiles</p>
+            </div>
+            <div className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm">
+              <span className="text-[10px] font-bold text-purple-600 tracking-wider uppercase">Admins</span>
+              <h3 className="text-3xl font-black text-slate-800 mt-1">{stats.admins}</h3>
+              <p className="text-[10px] text-[#6b7280] mt-1">With absolute hub authority</p>
+            </div>
+            <div className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase block">Audit Log</span>
+                <button className="text-xs font-extrabold text-[#003399] hover:underline mt-2 flex items-center gap-1">
+                  View Activity
+                  <svg className="h-3.5 w-3.5 text-[#003399] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </button>
+              </div>
+              <div className="h-10 w-10 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 shrink-0">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
             </div>
           </div>
 
-          {/* Search & Filters */}
-          <div style={s.filterRow}>
-            <div style={s.searchWrap}>
-              <span style={s.searchIcon}>🔍</span>
+          {/* Search & Filters Group */}
+          <div className="flex items-center justify-between gap-4 flex-wrap select-none shrink-0">
+            <div className="flex-1 min-w-[240px] flex items-center gap-2 bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 shadow-sm">
+              <svg className="h-4 w-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
               <input
                 type="text"
                 placeholder="Search by name or email..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={s.searchInput}
+                className="border-none bg-transparent outline-none text-xs md:text-sm text-slate-800 placeholder-gray-400 w-full"
               />
             </div>
-            <div style={s.filterGroup}>
-              <div style={s.selectWrap}>
-                <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} style={s.filterSelect}>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <select
+                  value={roleFilter}
+                  onChange={e => setRoleFilter(e.target.value)}
+                  className="appearance-none pl-3 pr-8 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                >
                   <option>All Roles</option>
                   <option>admin</option>
                   <option>supervisor</option>
                   <option>employee</option>
                 </select>
-                <span style={s.selectArrow}>▾</span>
+                <svg className="h-4 w-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
               </div>
-              <div style={s.selectWrap}>
-                <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={s.filterSelect}>
+
+              <div className="relative">
+                <select
+                  value={deptFilter}
+                  onChange={e => setDeptFilter(e.target.value)}
+                  className="appearance-none pl-3 pr-8 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                >
                   <option>All Departments</option>
                   <option>IT Support</option>
                   <option>Engineering</option>
@@ -237,93 +451,153 @@ export default function UserManagementPage() {
                   <option>Finance</option>
                   <option>Facilities</option>
                 </select>
-                <span style={s.selectArrow}>▾</span>
+                <svg className="h-4 w-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
               </div>
             </div>
           </div>
 
-          {/* Table */}
-          <div style={s.tableCard}>
-            <table style={s.table}>
+          {/* User List Table Card */}
+          <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-sm">
+            <table className="w-full border-collapse text-left">
               <thead>
-                <tr style={s.thead}>
-                  <th style={s.th}>User</th>
-                  <th style={s.th}>Role</th>
-                  <th style={s.th}>Department</th>
-                  <th style={s.th}>Status</th>
-                  <th style={s.th}>Last Login</th>
-                  <th style={{...s.th, width: 36}}></th>
+                <tr className="bg-slate-50/70 border-b border-gray-200 select-none">
+                  <th className="p-3 md:p-4 text-[10px] md:text-xs font-bold text-slate-400 tracking-wider uppercase">User</th>
+                  <th className="p-3 md:p-4 text-[10px] md:text-xs font-bold text-slate-400 tracking-wider uppercase">Role</th>
+                  <th className="p-3 md:p-4 text-[10px] md:text-xs font-bold text-slate-400 tracking-wider uppercase">Department</th>
+                  <th className="p-3 md:p-4 text-[10px] md:text-xs font-bold text-slate-400 tracking-wider uppercase">Status</th>
+                  <th className="p-3 md:p-4 text-[10px] md:text-xs font-bold text-slate-400 tracking-wider uppercase">Last Login</th>
+                  <th className="p-3 md:p-4 w-12"></th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} style={s.emptyCell}><span style={s.spinner}/> Loading users...</td></tr>
+                  <tr>
+                    <td colSpan={6} className="p-10 text-center text-slate-400 font-semibold text-xs md:text-sm">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="h-4 w-4 border-2 border-gray-300 border-t-[#003399] rounded-full animate-spin"></div>
+                        Loading users...
+                      </div>
+                    </td>
+                  </tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={6} style={s.emptyCell}>No users found.</td></tr>
+                  <tr>
+                    <td colSpan={6} className="p-12 text-center text-slate-400 font-semibold text-xs md:text-sm">
+                      No users found.
+                    </td>
+                  </tr>
                 ) : filtered.map(user => {
                   const userStatus = getUserStatus(user);
                   const st = STATUS_STYLE[userStatus];
                   const rl = ROLE_STYLE[user.role] || ROLE_STYLE.employee;
                   const lastLogin = getLastLogin(user);
                   return (
-                    <tr key={user.id} style={s.tr}>
-                      {/* User */}
-                      <td style={s.td}>
-                        <div style={s.userCell}>
-                          <div style={{...s.userAvatar, background: avatarColor(user.full_name)}}>
-                            {user.full_name?.slice(0,2).toUpperCase() || "U"}
+                    <tr key={user.id} className="border-b border-slate-100 hover:bg-slate-50/40 transition-colors">
+                      {/* Profile & Name */}
+                      <td className="p-3 md:p-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="h-9 w-9 rounded-full text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-inner select-none"
+                            style={{ background: avatarColor(user.full_name) }}
+                          >
+                            {user.full_name?.slice(0, 2).toUpperCase() || "U"}
                           </div>
-                          <div>
-                            <div style={{...s.userName, color: user.is_active || userStatus === "pending" ? "#111827" : "#9CA3AF", textDecoration: userStatus === "deactivated" ? "line-through" : "none"}}>
+                          <div className="min-w-0">
+                            <p
+                              className="text-xs md:text-sm font-bold text-slate-800 truncate leading-snug"
+                              style={{ textDecoration: userStatus === "deactivated" ? "line-through" : "none" }}
+                            >
                               {user.full_name}
-                            </div>
-                            <div style={s.userEmail}>{user.email}</div>
+                            </p>
+                            <p className="text-[10px] text-[#6b7280] font-medium truncate mt-0.5">{user.email}</p>
                           </div>
                         </div>
                       </td>
-                      {/* Role badge */}
-                      <td style={s.td}>
-                        <span style={{...s.roleBadge, background: rl.bg, color: rl.color}}>{rl.label}</span>
+
+                      {/* Role */}
+                      <td className="p-3 md:p-4 select-none">
+                        <span className="text-[10px] md:text-xs font-bold px-2.5 py-0.5 rounded-full" style={{ background: rl.bg, color: rl.color }}>
+                          {rl.label}
+                        </span>
                       </td>
-                      {/* Department */}
-                      <td style={s.td}>
-                        <span style={s.deptText}>{user.department || "—"}</span>
+
+                      {/* Dept */}
+                      <td className="p-3 md:p-4">
+                        <span className="text-xs font-bold text-slate-600">{user.department || "—"}</span>
                       </td>
+
                       {/* Status */}
-                      <td style={s.td}>
-                        <div style={s.statusCell}>
-                          <span style={{...s.statusDot, background: st.dot}}/>
-                          <span style={{fontSize: 13, color: st.color}}>{st.label}</span>
+                      <td className="p-3 md:p-4 select-none">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: st.dot }} />
+                          <span className="text-xs font-extrabold" style={{ color: st.color }}>{st.label}</span>
                         </div>
                       </td>
+
                       {/* Last login */}
-                      <td style={s.td}>
-                        <div style={s.lastLoginCell}>
-                          <span style={s.lastLoginText}>{lastLogin}</span>
-                          {/* Inline action for special statuses */}
+                      <td className="p-3 md:p-4">
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className="font-bold text-slate-700">{lastLogin}</span>
                           {userStatus === "pending" && (
-                            <button style={s.resendBtn}>Resend</button>
+                            <button className="text-[10px] font-extrabold text-[#003399] hover:underline uppercase">Resend</button>
                           )}
                           {userStatus === "deactivated" && (
-                            <button style={s.reactivateBtn} onClick={() => toggleUserActive(user.id, false)}>
+                            <button onClick={() => toggleUserActive(user.id, false)} className="text-[10px] font-extrabold text-emerald-600 hover:underline uppercase">
                               Reactivate
                             </button>
                           )}
                         </div>
                       </td>
-                      {/* Kebab menu */}
-                      <td style={{...s.td, position: "relative"}} onClick={e => { e.stopPropagation(); setOpenMenu(openMenu === user.id ? null : user.id); }}>
-                        <button style={s.kebabBtn}>⋮</button>
+
+                      {/* Kebab action dropdown */}
+                      <td className="p-3 md:p-4 relative" onClick={e => { e.stopPropagation(); setOpenMenu(openMenu === user.id ? null : user.id); }}>
+                        <button className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-gray-100 hover:text-slate-700 transition">
+                          <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                          </svg>
+                        </button>
                         {openMenu === user.id && (
-                          <div style={s.dropdown}>
-                            <button style={s.dropItem} onClick={() => navigate(`/profile`)}>👁 View Profile</button>
-                            <button style={s.dropItem} onClick={() => { updateUserRole(user.id, user.role === "admin" ? "employee" : "admin"); setOpenMenu(null); }}>
-                              🔄 Change Role
+                          <div className="absolute right-4 top-10 bg-white border border-gray-200 rounded-xl shadow-xl z-20 min-w-[160px] overflow-hidden select-none animate-fade-in text-xs font-bold text-slate-700">
+                            <button onClick={() => navigate(`/profile`)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition flex items-center gap-2">
+                              <svg className="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                              View Profile
                             </button>
-                            <button style={s.dropItem}>✉ Send Message</button>
-                            <div style={s.dropDivider}/>
-                            <button style={{...s.dropItem, color: "#DC2626"}} onClick={() => { toggleUserActive(user.id, user.is_active); setOpenMenu(null); }}>
-                              {user.is_active ? "🚫 Deactivate" : "✅ Reactivate"}
+                            <button onClick={() => { updateUserRole(user.id, user.role === "admin" ? "employee" : "admin"); setOpenMenu(null); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition flex items-center gap-2">
+                              <svg className="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5" />
+                              </svg>
+                              Change Role
+                            </button>
+                            <button className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition flex items-center gap-2">
+                              <svg className="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              Send Message
+                            </button>
+                            <div className="h-px bg-slate-100" />
+                            <button
+                              onClick={() => { toggleUserActive(user.id, user.is_active); setOpenMenu(null); }}
+                              className={`w-full text-left px-4 py-2.5 hover:bg-slate-50 transition flex items-center gap-2 font-black ${user.is_active ? "text-red-600" : "text-emerald-600"}`}
+                            >
+                              {user.is_active ? (
+                                <>
+                                  <svg className="h-4 w-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                  </svg>
+                                  Deactivate
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="h-4 w-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  Reactivate
+                                </>
+                              )}
                             </button>
                           </div>
                         )}
@@ -334,172 +608,123 @@ export default function UserManagementPage() {
               </tbody>
             </table>
 
-            {/* Pagination */}
-            <div style={s.pagination}>
-              <span style={s.pageInfo}>Showing 1 to {Math.min(PAGE_SIZE, filtered.length)} of {stats.total} users</span>
-              <div style={s.pageButtons}>
-                <button style={s.pageNavBtn} disabled={page === 1} onClick={() => setPage(p => Math.max(1, p-1))}>Previous</button>
-                <button style={s.pageNavBtn} onClick={() => setPage(p => p+1)}>Next</button>
+            {/* Pagination footer */}
+            <div className="flex items-center justify-between p-4 border-t border-gray-200 select-none flex-wrap gap-4">
+              <span className="text-xs font-semibold text-slate-500">
+                Showing 1 to {Math.min(PAGE_SIZE, filtered.length)} of {stats.total} users
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page === 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className="px-3.5 py-1.5 bg-white border border-gray-300 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg text-xs font-bold transition text-slate-700"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setPage(p => p + 1)}
+                  className="px-3.5 py-1.5 bg-white border border-gray-300 hover:bg-slate-50 rounded-lg text-xs font-bold transition text-slate-700"
+                >
+                  Next
+                </button>
               </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
 
       {/* ── INVITE MODAL ── */}
       {showInviteModal && (
-        <div style={s.modalOverlay} onClick={() => setShowInviteModal(false)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
-            <div style={s.modalHeader}>
-              <h2 style={s.modalTitle}>Invite New User</h2>
-              <button style={s.modalClose} onClick={() => setShowInviteModal(false)}>×</button>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setShowInviteModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 select-none">
+              <h2 className="text-base md:text-lg font-black text-[#111827]">Invite New User</h2>
+              <button onClick={() => setShowInviteModal(false)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#111827] transition-colors">
+                <svg className="h-5 w-5 animate-spin-once" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            {inviteError && <div style={s.errorBox}>⚠ {inviteError}</div>}
-            <div style={s.modalBody}>
-              <div style={s.fieldGroup}>
-                <label style={s.label}>Full Name *</label>
-                <input type="text" value={inviteForm.full_name} onChange={e => setInviteForm(p=>({...p,full_name:e.target.value}))}
-                  placeholder="Nama lengkap karyawan" style={s.input}
-                  onFocus={e=>e.target.style.borderColor="#2563EB"} onBlur={e=>e.target.style.borderColor="#D1D5DB"}/>
+
+            {/* Error banner */}
+            {inviteError && (
+              <div className="mx-6 mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-xs font-bold text-red-600 flex items-center gap-1.5 select-none">
+                <svg className="h-4 w-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                {inviteError}
               </div>
-              <div style={s.fieldGroup}>
-                <label style={s.label}>Email *</label>
-                <input type="email" value={inviteForm.email} onChange={e => setInviteForm(p=>({...p,email:e.target.value}))}
-                  placeholder="karyawan@epson.co.id" style={s.input}
-                  onFocus={e=>e.target.style.borderColor="#2563EB"} onBlur={e=>e.target.style.borderColor="#D1D5DB"}/>
+            )}
+
+            {/* Modal Body Form */}
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Full Name *</label>
+                <input
+                  type="text"
+                  value={inviteForm.full_name}
+                  onChange={e => setInviteForm(p => ({ ...p, full_name: e.target.value }))}
+                  placeholder="Nama lengkap karyawan"
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs md:text-sm text-slate-800 placeholder-gray-400 outline-none focus:border-[#003399] transition-all"
+                />
               </div>
-              <div style={s.fieldGroup}>
-                <label style={s.label}>Password Sementara *</label>
-                <input type="password" value={inviteForm.password} onChange={e => setInviteForm(p=>({...p,password:e.target.value}))}
-                  placeholder="Min. 6 karakter" style={s.input}
-                  onFocus={e=>e.target.style.borderColor="#2563EB"} onBlur={e=>e.target.style.borderColor="#D1D5DB"}/>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Email *</label>
+                <input
+                  type="email"
+                  value={inviteForm.email}
+                  onChange={e => setInviteForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="karyawan@epson.co.id"
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs md:text-sm text-slate-800 placeholder-gray-400 outline-none focus:border-[#003399] transition-all"
+                />
               </div>
-              <div style={s.fieldGroup}>
-                <label style={s.label}>Role</label>
-                <select value={inviteForm.role} onChange={e => setInviteForm(p=>({...p,role:e.target.value}))} style={s.select}>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Password Sementara *</label>
+                <input
+                  type="password"
+                  value={inviteForm.password}
+                  onChange={e => setInviteForm(p => ({ ...p, password: e.target.value }))}
+                  placeholder="Min. 6 karakter"
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs md:text-sm text-slate-800 placeholder-gray-400 outline-none focus:border-[#003399] transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5 select-none">
+                <label className="text-xs font-bold text-slate-700">Role</label>
+                <select
+                  value={inviteForm.role}
+                  onChange={e => setInviteForm(p => ({ ...p, role: e.target.value }))}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs md:text-sm text-slate-800 bg-white outline-none cursor-pointer"
+                >
                   <option value="employee">Employee</option>
                   <option value="supervisor">Supervisor</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
             </div>
-            <div style={s.modalFooter}>
-              <button style={s.cancelBtn} onClick={() => setShowInviteModal(false)}>Cancel</button>
-              <button style={{...s.submitBtn, opacity: inviting?0.7:1}} onClick={handleInvite} disabled={inviting}>
+
+            {/* Modal Footer */}
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3 select-none">
+              <button
+                onClick={() => setShowInviteModal(false)}
+                className="border border-gray-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleInvite}
+                disabled={inviting}
+                className="bg-[#003399] hover:bg-[#124090] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded-xl text-xs font-bold transition shadow-sm"
+              >
                 {inviting ? "Inviting..." : "Send Invite"}
               </button>
             </div>
           </div>
         </div>
       )}
-
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} tr:hover td{background:#F9FAFB}`}</style>
     </div>
   );
 }
-
-// ── Sub Components ──────────────────────────────────────
-function NavItem({ icon, label, active, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button style={{...s.navItem, background:active?"#EFF6FF":hovered?"#F9FAFB":"transparent", color:active?"#2563EB":"#374151", fontWeight:active?600:400}}
-      onClick={onClick} onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}>
-      <span style={s.navIcon}>{icon}</span>
-      <span style={s.navLabel}>{label}</span>
-    </button>
-  );
-}
-
-function StatCard({ label, value }) {
-  return (
-    <div style={s.statCard}>
-      <div style={s.statLabel}>{label}</div>
-      <div style={s.statValue}>{value}</div>
-    </div>
-  );
-}
-
-// ── Styles ──────────────────────────────────────────────
-const s = {
-  root: { display: "flex", minHeight: "100vh", background: "#F3F4F6", fontFamily: "'DM Sans','Segoe UI',sans-serif" },
-  sidebar: { width: 200, background: "#FFFFFF", borderRight: "1px solid #E5E7EB", display: "flex", flexDirection: "column", flexShrink: 0 },
-  sidebarLogo: { display: "flex", alignItems: "center", gap: 10, padding: "18px 16px", borderBottom: "1px solid #F3F4F6" },
-  logoIcon: { width: 32, height: 32, background: "#EFF6FF", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" },
-  logoText: { fontSize: 15, fontWeight: 700, color: "#111827" },
-  nav: { flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 },
-  navSection: { fontSize: 10, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.08em", padding: "12px 8px 4px", textTransform: "uppercase" },
-  navItem: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", width: "100%", transition: "background 0.12s" },
-  navIcon: { fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 },
-  navLabel: { fontSize: 13, lineHeight: 1.3 },
-  sidebarFooter: { padding: "12px 14px", borderTop: "1px solid #F3F4F6", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
-  avatarSmall: { width: 32, height: 32, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 },
-  footerName: { fontSize: 13, fontWeight: 600, color: "#111827" },
-  footerSub: { fontSize: 11, color: "#9CA3AF" },
-  main: { flex: 1, display: "flex", flexDirection: "column", overflow: "auto" },
-  topbar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", background: "#FFFFFF", borderBottom: "1px solid #E5E7EB" },
-  pageTitle: { fontSize: 18, fontWeight: 700, color: "#111827", margin: 0 },
-  topbarRight: { display: "flex", alignItems: "center", gap: 10 },
-  bellBtn: { background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 8, display: "flex" },
-  inviteBtn: { background: "#2563EB", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" },
-  content: { padding: "20px 24px", flex: 1, display: "flex", flexDirection: "column", gap: 16 },
-  sectionHeader: { marginBottom: 4 },
-  sectionTitle: { fontSize: 20, fontWeight: 700, color: "#111827", margin: "0 0 4px" },
-  sectionSub: { fontSize: 13, color: "#6B7280", margin: 0 },
-  statRow: { display: "flex", gap: 12 },
-  statCard: { flex: 1, background: "#FFFFFF", borderRadius: 10, border: "1px solid #E5E7EB", padding: "16px 20px" },
-  statLabel: { fontSize: 13, color: "#6B7280", marginBottom: 6 },
-  statValue: { fontSize: 28, fontWeight: 700, color: "#111827" },
-  auditCard: { flex: 1, background: "#FFFFFF", borderRadius: 10, border: "1px solid #E5E7EB", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" },
-  auditLabel: { fontSize: 13, color: "#6B7280" },
-  auditBtn: { background: "none", border: "none", fontSize: 13, color: "#2563EB", fontWeight: 600, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 4 },
-  filterRow: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
-  searchWrap: { flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 8, padding: "8px 12px" },
-  searchIcon: { fontSize: 13 },
-  searchInput: { border: "none", background: "transparent", outline: "none", fontSize: 13, color: "#374151", fontFamily: "inherit", flex: 1 },
-  filterGroup: { display: "flex", gap: 8 },
-  selectWrap: { position: "relative" },
-  filterSelect: { padding: "8px 28px 8px 12px", borderRadius: 8, border: "1px solid #E5E7EB", fontSize: 13, color: "#374151", background: "#FFFFFF", appearance: "none", cursor: "pointer", fontFamily: "inherit" },
-  selectArrow: { position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: "#9CA3AF", pointerEvents: "none" },
-  tableCard: { background: "#FFFFFF", borderRadius: 12, border: "1px solid #E5E7EB", overflow: "hidden" },
-  table: { width: "100%", borderCollapse: "collapse" },
-  thead: { background: "#FFFFFF" },
-  th: { padding: "10px 16px", fontSize: 12, fontWeight: 600, color: "#374151", textAlign: "left", borderBottom: "1px solid #E5E7EB" },
-  tr: { borderBottom: "1px solid #F3F4F6", transition: "background 0.1s" },
-  td: { padding: "12px 16px", verticalAlign: "middle" },
-  userCell: { display: "flex", alignItems: "center", gap: 10 },
-  userAvatar: { width: 36, height: 36, borderRadius: "50%", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 },
-  userName: { fontSize: 13, fontWeight: 600, marginBottom: 2 },
-  userEmail: { fontSize: 11, color: "#9CA3AF" },
-  roleBadge: { fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20 },
-  deptText: { fontSize: 13, color: "#374151" },
-  statusCell: { display: "flex", alignItems: "center", gap: 6 },
-  statusDot: { width: 7, height: 7, borderRadius: "50%", flexShrink: 0 },
-  lastLoginCell: { display: "flex", alignItems: "center", gap: 10 },
-  lastLoginText: { fontSize: 13, color: "#374151" },
-  resendBtn: { fontSize: 11, fontWeight: 600, color: "#2563EB", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" },
-  reactivateBtn: { fontSize: 11, fontWeight: 600, color: "#15803D", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" },
-  kebabBtn: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#6B7280", padding: "0 4px", lineHeight: 1 },
-  dropdown: { position: "absolute", right: 8, top: "100%", background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 100, minWidth: 160, overflow: "hidden" },
-  dropItem: { display: "block", width: "100%", padding: "8px 14px", border: "none", background: "transparent", fontSize: 13, color: "#374151", cursor: "pointer", textAlign: "left", fontFamily: "inherit" },
-  dropDivider: { height: 1, background: "#F3F4F6" },
-  pagination: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: "1px solid #F3F4F6" },
-  pageInfo: { fontSize: 12, color: "#6B7280" },
-  pageButtons: { display: "flex", gap: 8 },
-  pageNavBtn: { padding: "6px 16px", border: "1px solid #E5E7EB", background: "#FFFFFF", borderRadius: 6, fontSize: 13, color: "#374151", cursor: "pointer", fontFamily: "inherit" },
-  emptyCell: { padding: "32px", textAlign: "center", color: "#9CA3AF", fontSize: 13 },
-  spinner: { display: "inline-block", width: 14, height: 14, border: "2px solid #E5E7EB", borderTopColor: "#2563EB", borderRadius: "50%", animation: "spin 0.6s linear infinite", marginRight: 8 },
-  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 },
-  modal: { background: "#FFFFFF", borderRadius: 14, width: "100%", maxWidth: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.15)", overflow: "hidden" },
-  modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", borderBottom: "1px solid #F3F4F6" },
-  modalTitle: { fontSize: 16, fontWeight: 700, color: "#111827", margin: 0 },
-  modalClose: { background: "none", border: "none", fontSize: 20, color: "#9CA3AF", cursor: "pointer", padding: 0, lineHeight: 1 },
-  modalBody: { padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 },
-  modalFooter: { padding: "14px 24px", borderTop: "1px solid #F3F4F6", display: "flex", justifyContent: "flex-end", gap: 10 },
-  fieldGroup: { display: "flex", flexDirection: "column", gap: 6 },
-  label: { fontSize: 13, fontWeight: 600, color: "#374151" },
-  input: { padding: "9px 12px", borderRadius: 8, border: "1px solid #D1D5DB", fontSize: 13, color: "#111827", outline: "none", fontFamily: "inherit", transition: "border-color 0.15s" },
-  select: { padding: "9px 12px", borderRadius: 8, border: "1px solid #D1D5DB", fontSize: 13, color: "#111827", outline: "none", fontFamily: "inherit", background: "#FFFFFF" },
-  errorBox: { margin: "0 24px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#DC2626" },
-  cancelBtn: { padding: "9px 20px", borderRadius: 8, border: "1px solid #D1D5DB", background: "#FFFFFF", fontSize: 13, fontWeight: 500, color: "#374151", cursor: "pointer" },
-  submitBtn: { padding: "9px 20px", borderRadius: 8, border: "none", background: "#2563EB", fontSize: 13, fontWeight: 600, color: "#FFFFFF", cursor: "pointer" },
-};

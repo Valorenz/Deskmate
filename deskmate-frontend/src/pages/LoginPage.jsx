@@ -1,7 +1,13 @@
 // src/pages/LoginPage.jsx
+// -------------------------------------------------------
+// Authorized Personnel Login Page
+// Koneksi Backend:
+// - POST /api/v1/auth/login
+// - GET /api/v1/profiles/me
+// -------------------------------------------------------
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -55,11 +61,81 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#EAEEF2] px-4 py-8 font-sans">
-      <div className="w-full max-w-[400px] rounded-2xl bg-white p-6 sm:p-10 shadow-[0_4px_24px_rgba(0,0,0,0.08)]">
+  // ── FITUR CURSOR SPARKS (GEMINI STYLE EFFECT) ──
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (Math.random() > 0.25) return;
 
-        {/* ── HEADER BRANDING TUAN MUDA ── */}
+      const spark = document.createElement('div');
+      spark.className = 'cursor-spark';
+
+      const size = Math.random() * 8 + 4;
+      spark.style.width = `${size}px`;
+      spark.style.height = `${size}px`;
+
+      spark.style.left = `${e.clientX}px`;
+      spark.style.top = `${e.clientY}px`;
+
+      const colors = [
+        'radial-gradient(circle, #8ab4f8 10%, rgba(138,180,248,0) 80%)',
+        'radial-gradient(circle, #c58af9 10%, rgba(197,138,249,0) 80%)',
+        'radial-gradient(circle, #f382ac 10%, rgba(243,130,172,0) 80%)',
+        'radial-gradient(circle, #a8dab5 10%, rgba(168,218,181,0) 80%)',
+      ];
+      spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+      const driftX = (Math.random() - 0.5) * 60;
+      const driftY = (Math.random() - 0.5) * 60;
+      spark.style.setProperty('--drift-x', `${driftX}px`);
+      spark.style.setProperty('--drift-y', `${driftY}px`);
+
+      document.body.appendChild(spark);
+
+      setTimeout(() => {
+        spark.remove();
+      }, 800);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#EAEEF2] px-4 py-8 font-sans relative overflow-hidden">
+      {/* ─── STYLE OVERRIDE FOR HELVETICA NEUE & CURSOR SPARKS ─── */}
+      <style>{`
+        * {
+          font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+        }
+        @keyframes spark-fade {
+          0% {
+            transform: translate(0, 0) scale(0) rotate(0deg);
+            opacity: 0;
+          }
+          15% {
+            transform: translate(0, 0) scale(1) rotate(45deg);
+            opacity: 0.95;
+          }
+          100% {
+            transform: translate(var(--drift-x), var(--drift-y)) scale(0) rotate(180deg);
+            opacity: 0;
+          }
+        }
+        .cursor-spark {
+          position: fixed;
+          pointer-events: none;
+          z-index: 9999;
+          mix-blend-mode: screen;
+          animation: spark-fade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          clip-path: polygon(50% 0%, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0% 50%, 37% 37%);
+        }
+      `}</style>
+
+      <div className="w-full max-w-[400px] rounded-2xl bg-white p-6 sm:p-10 shadow-[0_4px_24px_rgba(0,0,0,0.08)] z-10 relative">
+
+        {/* ── HEADER BRANDING ── */}
         <div className="text-center mb-6">
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#003399] leading-none">
             EPSON
@@ -69,7 +145,7 @@ export default function LoginPage() {
           </span>
         </div>
 
-        {/* ── TITLES ACCORDING TO TUAN MUDA SPEC ── */}
+        {/* ── TITLES ── */}
         <div className="text-center mb-8">
           <h2 className="text-lg sm:text-xl font-bold text-[#1a1f2e]">
             Authorized Access Only
@@ -79,14 +155,17 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Error Box */}
+        {/* Error Box (Emoji replaced with SVG) */}
         {error && (
-          <div className="mb-4 rounded-lg p-2.5 px-3.5 text-xs font-medium bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626] flex items-center gap-1.5">
-            <span className="text-sm font-bold">⚠</span> {error}
+          <div className="mb-4 rounded-lg p-2.5 px-3.5 text-xs font-medium bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626] flex items-center gap-2">
+            <svg className="h-4 w-4 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>{error}</span>
           </div>
         )}
 
-        {/* ── FORM & LOGIC NGIKUT DOSSY ── */}
+        {/* ── FORM & LOGIC ── */}
         <form onSubmit={handleLogin} className="space-y-4">
           
           {/* Input Email */}
@@ -122,7 +201,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPw(!showPw)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#003399] transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#003399] transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center border-none bg-transparent cursor-pointer"
                 aria-label={showPw ? "Hide password" : "Show password"}
               >
                 {showPw ? (
@@ -164,7 +243,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-[#003399] py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#002266] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-h-[42px]"
+              className="w-full rounded-lg bg-[#003399] py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#002266] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-h-[42px] border-none cursor-pointer"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

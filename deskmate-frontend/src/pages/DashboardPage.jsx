@@ -1,8 +1,8 @@
 // src/pages/DashboardPage.jsx
 // -------------------------------------------------------
-// Employee Dashboard DeskMate
+// Employee Dashboard DeskMate (Redesigned with Premium Chatbot Aesthetics)
 // Sesuai desain screenshot: sidebar kiri, stat cards, quick actions,
-// recent tickets, system alerts, user profile card
+// recent tickets, system alerts, user profile card, Epson Brand Guideline
 // -------------------------------------------------------
 
 import { useState, useEffect } from "react";
@@ -15,7 +15,12 @@ export default function DashboardPage() {
   const [tickets, setTickets] = useState([]);
   const [stats, setStats] = useState({ open: 0, awaiting: 0, resolved: 0 });
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
   const role = getRole();
 
   useEffect(() => {
@@ -80,330 +85,432 @@ export default function DashboardPage() {
     return `${Math.floor(diff / 86400)}d ago`;
   };
 
-  const priorityIcon = (priority) => {
-    if (priority === "critical" || priority === "high") return "⚡";
-    if (priority === "medium") return "🖥";
-    return "✓";
+  // Replacement for raw priority emojis
+  const renderPriorityBadge = (priority) => {
+    if (priority === "critical" || priority === "high") {
+      return (
+        <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md uppercase shrink-0">
+          <svg className="h-3 w-3 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          HIGH
+        </span>
+      );
+    }
+    if (priority === "medium") {
+      return (
+        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md uppercase shrink-0">
+          <svg className="h-3 w-3 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          MID
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md uppercase shrink-0">
+        <svg className="h-3 w-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        LOW
+      </span>
+    );
   };
 
+  const fullName = profile?.full_name || getFullName() || "User";
+
+  // ── FITUR CURSOR SPARKS (GEMINI STYLE EFFECT) ──
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (Math.random() > 0.25) return;
+
+      const spark = document.createElement('div');
+      spark.className = 'cursor-spark';
+
+      const size = Math.random() * 8 + 4;
+      spark.style.width = `${size}px`;
+      spark.style.height = `${size}px`;
+
+      spark.style.left = `${e.clientX}px`;
+      spark.style.top = `${e.clientY}px`;
+
+      const colors = [
+        'radial-gradient(circle, #8ab4f8 10%, rgba(138,180,248,0) 80%)', // Blue
+        'radial-gradient(circle, #c58af9 10%, rgba(197,138,249,0) 80%)', // Purple
+        'radial-gradient(circle, #f382ac 10%, rgba(243,130,172,0) 80%)', // Pink
+        'radial-gradient(circle, #a8dab5 10%, rgba(168,218,181,0) 80%)', // Green
+      ];
+      spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+      const driftX = (Math.random() - 0.5) * 60;
+      const driftY = (Math.random() - 0.5) * 60;
+      spark.style.setProperty('--drift-x', `${driftX}px`);
+      spark.style.setProperty('--drift-y', `${driftY}px`);
+
+      document.body.appendChild(spark);
+
+      setTimeout(() => {
+        spark.remove();
+      }, 800);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
   return (
-    <div style={s.root}>
-      {/* ── SIDEBAR ── */}
-      <aside style={s.sidebar}>
-        {/* Logo */}
-        <div style={s.sidebarLogo}>
-          <div style={s.logoIcon}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#2563EB"/>
-            </svg>
-          </div>
-          <span style={s.logoText}>DeskMate</span>
-        </div>
+    <div className="flex h-screen w-full bg-[#f4f6fa] font-sans text-[#111827] overflow-hidden relative">
+      {/* ─── STYLE OVERRIDE FOR HELVETICA NEUE & CURSOR SPARKS ─── */}
+      <style>{`
+        * {
+          font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+        }
+        @keyframes spark-fade {
+          0% {
+            transform: translate(0, 0) scale(0) rotate(0deg);
+            opacity: 0;
+          }
+          15% {
+            transform: translate(0, 0) scale(1) rotate(45deg);
+            opacity: 0.95;
+          }
+          100% {
+            transform: translate(var(--drift-x), var(--drift-y)) scale(0) rotate(180deg);
+            opacity: 0;
+          }
+        }
+        .cursor-spark {
+          position: fixed;
+          pointer-events: none;
+          z-index: 9999;
+          mix-blend-mode: screen;
+          animation: spark-fade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          clip-path: polygon(50% 0%, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0% 50%, 37% 37%);
+        }
+      `}</style>
 
-        {/* Nav */}
-        <nav style={s.nav}>
-          <NavItem icon="🏠" label="Employee Dashboard" active onClick={() => navigate("/dashboard")} />
-          <NavItem icon="🤖" label="AI Chat Interface" onClick={() => navigate("/chat")} />
-          <NavItem icon="☰" label="Employee Ticket List" onClick={() => navigate("/tickets")} />
-          <NavItem icon="+" label="Create Ticket Form" onClick={() => navigate("/tickets/create")} />
-
-          {(role === "admin" || role === "supervisor") && (
-            <>
-              <div style={s.navSection}>ADMIN</div>
-              <NavItem icon="📄" label="Admin Document Management" onClick={() => navigate("/documents")} />
-              <NavItem icon="⚙" label="Admin User Management" onClick={() => navigate("/users")} />
-            </>
-          )}
-        </nav>
-
-        {/* User footer */}
-        <div style={s.sidebarFooter} onClick={() => navigate("/profile")} title="Profile & Settings">
-          <div style={s.avatarSmall}>
-            {profile?.full_name?.charAt(0)?.toUpperCase() || "U"}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={s.footerName}>{profile?.full_name || getFullName() || "User"}</div>
-            <div style={s.footerSub}>Profile & Settings</div>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── MAIN ── */}
-      <main style={s.main}>
-        {/* Header */}
-        <div style={s.header}>
-          <h1 style={s.pageTitle}>Employee Dashboard</h1>
-          <button style={s.bellBtn} title="Notifications">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      {/* ─── TOP HEADER (MATCHES CHATBOT HEADER) ─── */}
+      <header className="fixed top-0 left-0 right-0 flex h-14 md:h-16 items-center justify-between border-b border-[#d1d5db] bg-white px-3 md:px-6 shadow-sm z-30">
+        <div className="flex items-center gap-2 md:gap-4">
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+            className="rounded-lg p-2 text-[#6b7280] hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+          >
+            <svg className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
+          <div className="flex flex-col">
+            <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-[#003399] leading-none">EPSON</h1>
+            <span className="text-[9px] md:text-[10px] font-bold text-[#6b7280] tracking-wider mt-0.5">DESKMATE AI</span>
+          </div>
         </div>
 
-        {/* Content grid */}
-        <div style={s.contentGrid}>
-          {/* LEFT COLUMN */}
-          <div style={s.leftCol}>
-            {/* Stat cards */}
-            <div style={s.statRow}>
-              <StatCard
-                label="Open Tickets"
-                value={loading ? "—" : stats.open}
-                sub="↑ 2 since yesterday"
-                icon="💬"
-                iconBg="#DBEAFE"
-              />
-              <StatCard
-                label="Awaiting Response"
-                value={loading ? "—" : stats.awaiting}
-                sub="Needs attention soon"
-                icon="⏳"
-                iconBg="#FEF9C3"
-              />
-              <StatCard
-                label="Resolved (7d)"
-                value={loading ? "—" : stats.resolved}
-                sub="Great work this week"
-                icon="✓"
-                iconBg="#DCFCE7"
-                iconColor="#15803D"
-              />
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Search Button */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+
+          {/* Settings Button */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+
+          {/* Bell / Toggle Panel Button */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </button>
+
+          <div className="h-6 w-px bg-gray-300 mx-1 md:mx-2 hidden sm:block"></div>
+          
+          <div onClick={() => navigate("/profile")} className="flex items-center gap-1 md:gap-2 pl-1 cursor-pointer hover:opacity-80 transition-opacity select-none">
+            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
+              {fullName.charAt(0).toUpperCase()}
             </div>
-
-            {/* Quick Actions */}
-            <div style={s.section}>
-              <h2 style={s.sectionTitle}>Quick Actions</h2>
-              <div style={s.actionRow}>
-                <button style={s.actionCardWhite} onClick={() => navigate("/tickets/create")}>
-                  <div style={s.actionIconWhite}>＋</div>
-                  <div>
-                    <div style={s.actionLabel}>Create Ticket</div>
-                    <div style={s.actionSub}>Report an issue</div>
-                  </div>
-                </button>
-                <button style={s.actionCardBlue} onClick={() => navigate("/chat")}>
-                  <div style={s.actionIconBlue}>🤖</div>
-                  <div>
-                    <div style={s.actionLabelBlue}>UX Pilot AI Chat</div>
-                    <div style={s.actionSubBlue}>Get instant help</div>
-                  </div>
-                </button>
-              </div>
+            <div className="hidden md:flex flex-col text-left">
+              <span className="text-xs font-bold text-[#111827]">{fullName}</span>
+              <span className="text-[10px] text-[#6b7280]">
+                {role === "admin" ? "Admin" : role === "supervisor" ? "Supervisor" : "Karyawan"}
+              </span>
             </div>
+          </div>
+        </div>
+      </header>
 
-            {/* Recent Ticket Activity */}
-            <div style={s.section}>
-              <div style={s.sectionHeader}>
-                <h2 style={s.sectionTitle}>Recent Ticket Activity</h2>
-                <button style={s.viewAll} onClick={() => navigate("/tickets")}>View All</button>
-              </div>
+      {/* ─── MAIN LAYOUT CONTAINER ─── */}
+      <div className="flex flex-1 pt-14 md:pt-16 overflow-hidden relative w-full h-full">
+        {isSidebarOpen && (
+          <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+        )}
 
-              {loading ? (
-                <div style={s.emptyState}>Memuat tiket...</div>
-              ) : tickets.length === 0 ? (
-                <div style={s.emptyState}>Belum ada tiket. Buat tiket pertama Anda!</div>
-              ) : (
-                <div style={s.ticketList}>
-                  {tickets.map((t) => (
-                    <div key={t.id} style={s.ticketItem} onClick={() => navigate(`/tickets/${t.id}`)}>
-                      <div style={s.ticketIcon}>{priorityIcon(t.priority)}</div>
-                      <div style={s.ticketContent}>
-                        <div style={s.ticketTitle}>{t.title}</div>
-                        <div style={s.ticketDesc}>{t.description?.slice(0, 60)}...</div>
-                        <div style={{ marginTop: 6 }}>{statusBadge(t.status)}</div>
-                      </div>
-                      <div style={s.ticketTime}>{timeAgo(t.created_at)}</div>
-                    </div>
-                  ))}
-                </div>
+        {/* ── SIDEBAR PANEL LEFT ── */}
+        <div className={`fixed md:relative inset-y-0 left-0 z-40 bg-[#f8fafd] border-r border-gray-200/80 flex flex-col transition-all duration-300 ease-in-out w-[280px] md:w-64 flex-shrink-0 ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:-ml-64 md:translate-x-0 md:opacity-100'}`}>
+          <div className="p-4 flex-1 overflow-y-auto relative">
+            <button onClick={() => navigate("/chat")} className="w-full rounded-full border border-[#d1d5db] bg-white text-[#111827] py-2.5 text-sm font-semibold transition hover:bg-gray-50 mb-6 shadow-sm">+ Chat Baru</button>
+            
+            <p className="text-xs font-bold text-[#9ca3af] mb-3 px-1 tracking-wider uppercase">Menu Navigasi</p>
+            <nav className="space-y-1 mb-6">
+              <span className="flex items-center gap-3 bg-[#e5e7eb] text-[#111827] rounded-lg p-3 text-sm font-semibold cursor-default">
+                <span>Dashboard Utama</span>
+              </span>
+              <button onClick={() => navigate("/chat")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>AI Helpdesk Chat</span>
+              </button>
+              <button onClick={() => navigate("/tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Daftar Tiket Saya</span>
+              </button>
+              <button onClick={() => navigate("/tickets/create")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Buat Tiket Baru</span>
+              </button>
+
+              {/* Rute Khusus Supervisor */}
+              {(role === "supervisor" || role === "admin") && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Supervisor</p>
+                  <button onClick={() => navigate("/all-tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Semua Tiket Unit</span>
+                  </button>
+                </>
               )}
-            </div>
+
+              {/* Rute Khusus Admin */}
+              {role === "admin" && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Admin</p>
+                  <button onClick={() => navigate("/documents")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Kelola Dokumen RAG</span>
+                  </button>
+                  <button onClick={() => navigate("/users")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Kelola Pengguna</span>
+                  </button>
+                </>
+              )}
+            </nav>
           </div>
-
-          {/* RIGHT COLUMN */}
-          <div style={s.rightCol}>
-            {/* System Alerts */}
-            <div style={s.card}>
-              <div style={s.sectionHeader}>
-                <h2 style={s.sectionTitle}>System Alerts</h2>
-                <span style={s.alertBadge}>2</span>
-              </div>
-              <div style={s.alertList}>
-                <AlertItem
-                  icon="ℹ"
-                  iconBg="#DBEAFE"
-                  title="Scheduled Maintenance"
-                  desc="IT systems will be down this Saturday from 2AM to 4AM EST."
-                />
-                <AlertItem
-                  icon="📄"
-                  iconBg="#F3F4F6"
-                  title="New HR Policy Document"
-                  desc="Please review the updated remote work guidelines in Document Management."
-                />
-              </div>
+          
+          <div className="p-4 border-t border-gray-200/80 flex items-center gap-3 cursor-pointer hover:bg-gray-100/50 transition-colors" onClick={() => navigate("/profile")}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs">
+              {fullName.charAt(0).toUpperCase()}
             </div>
-
-            {/* Profile Card */}
-            <div style={s.profileCard}>
-              <div style={s.avatarLarge}>
-                {profile?.full_name?.charAt(0)?.toUpperCase() || "U"}
-              </div>
-              <div style={s.profileName}>{profile?.full_name || getFullName() || "User"}</div>
-              <div style={s.profileDept}>{profile?.department || "Manufacturing Operations"}</div>
-              <div style={s.profileDivider} />
-              <div style={s.profileRow}>
-                <span style={s.profileKey}>Employee ID</span>
-                <span style={s.profileVal}>{profile?.employee_id || "—"}</span>
-              </div>
-              <div style={s.profileRow}>
-                <span style={s.profileKey}>Location</span>
-                <span style={s.profileVal}>Plant B</span>
-              </div>
-              <button style={s.logoutBtn} onClick={handleLogout}>Logout</button>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-[#111827] truncate">{fullName}</div>
+              <div className="text-[10px] text-[#6b7280]">Profile & Settings</div>
             </div>
           </div>
         </div>
-      </main>
-    </div>
-  );
-}
 
-// ── Sub Components ─────────────────────────────────────
+        {/* ── AREA UTAMA KONTEN DASHBOARD (PREMIUM CORPORATE DECK STYLE) ── */}
+        <main className="flex-1 overflow-y-auto bg-[#f0f4f9] p-4 md:p-6 space-y-6">
+          
+          {/* Section Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-extrabold text-[#124090] tracking-widest uppercase">Epson Factory Hub</span>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mt-1">Dashboard Karyawan</h2>
+              <p className="text-xs text-[#6b7280] mt-0.5">Kelola antrean bantuan IT helpdesk operasional Anda dan pantuan troubleshoot mesin.</p>
+            </div>
+          </div>
 
-function NavItem({ icon, label, active, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      style={{
-        ...s.navItem,
-        background: active ? "#EFF6FF" : hovered ? "#F9FAFB" : "transparent",
-        color: active ? "#2563EB" : "#374151",
-        fontWeight: active ? 600 : 400,
-      }}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <span style={s.navIcon}>{icon}</span>
-      <span style={s.navLabel}>{label}</span>
-    </button>
-  );
-}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            
+            {/* LEFT COLUMN: STATS, QUICK ACTIONS, RECENT ACTIVITY */}
+            <div className="lg:col-span-2 space-y-6">
+              
+              {/* Stat Cards Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-blue-600 tracking-wider uppercase">Open Tickets</span>
+                    <h3 className="text-3xl font-black text-slate-800 mt-1">{loading ? "—" : stats.open}</h3>
+                    <p className="text-[10px] text-[#6b7280] mt-1">Dalam antrean bantuan</p>
+                  </div>
+                  <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
+                  </div>
+                </div>
 
-function StatCard({ label, value, sub, icon, iconBg, iconColor = "#2563EB" }) {
-  return (
-    <div style={s.statCard}>
-      <div style={s.statTop}>
-        <div>
-          <div style={s.statLabel}>{label}</div>
-          <div style={s.statValue}>{value}</div>
-        </div>
-        <div style={{ ...s.statIconWrap, background: iconBg }}>
-          <span style={{ fontSize: 18, color: iconColor }}>{icon}</span>
-        </div>
+                <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-amber-600 tracking-wider uppercase">Awaiting Response</span>
+                    <h3 className="text-3xl font-black text-slate-800 mt-1">{loading ? "—" : stats.awaiting}</h3>
+                    <p className="text-[10px] text-[#6b7280] mt-1">Menunggu respon teknisi</p>
+                  </div>
+                  <div className="h-10 w-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
+                    <svg className="h-5 w-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-green-600 tracking-wider uppercase">Resolved Tickets</span>
+                    <h3 className="text-3xl font-black text-slate-800 mt-1">{loading ? "—" : stats.resolved}</h3>
+                    <p className="text-[10px] text-[#6b7280] mt-1">Telah sukses diselesaikan</p>
+                  </div>
+                  <div className="h-10 w-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center shrink-0">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions Row */}
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm">
+                <h3 className="text-xs font-extrabold text-slate-400 tracking-wider mb-4 uppercase">Akses Cepat</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  
+                  <button onClick={() => navigate("/tickets/create")} className="flex items-center gap-4 bg-white border border-gray-200 hover:border-blue-400 hover:shadow-md rounded-2xl p-4 transition-all duration-300 text-left w-full cursor-pointer group">
+                    <div className="h-11 w-11 rounded-xl bg-slate-50 group-hover:bg-blue-50 text-[#124090] text-xl font-bold flex items-center justify-center transition-colors">
+                      <svg className="h-5 w-5 text-[#124090]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-slate-800">Buat Tiket Baru</h4>
+                      <p className="text-xs text-gray-400 mt-0.5">Laporkan masalah teknis ke IT</p>
+                    </div>
+                  </button>
+
+                  <button onClick={() => navigate("/chat")} className="flex items-center gap-4 bg-gradient-to-br from-[#124090] via-[#003399] to-[#8ab4f8] hover:shadow-lg rounded-2xl p-4 transition-all duration-300 text-left w-full cursor-pointer group">
+                    <div className="h-11 w-11 rounded-xl bg-white/20 text-white text-xl flex items-center justify-center">
+                      <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-white">AI Helpdesk Chat</h4>
+                      <p className="text-xs text-white/85 mt-0.5">Konsultasi solusi instan mesin</p>
+                    </div>
+                  </button>
+
+                </div>
+              </div>
+
+              {/* Recent Ticket Activity */}
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
+                  <h3 className="text-xs font-bold text-[#9ca3af] tracking-wider uppercase">Aktivitas Tiket Terbaru</h3>
+                  <button className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors" onClick={() => navigate("/tickets")}>Lihat Semua</button>
+                </div>
+
+                {loading ? (
+                  <div className="text-center py-6 text-sm text-gray-400 flex items-center justify-center gap-2">
+                    <div className="h-4 w-4 border-2 border-gray-300 border-t-[#124090] rounded-full animate-spin"></div>
+                    Memuat tiket...
+                  </div>
+                ) : tickets.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-gray-400 italic">Belum ada aktivitas tiket. Silakan buat tiket pertama Anda!</div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {tickets.map((t) => (
+                      <div key={t.id} className="flex gap-4 py-3.5 hover:bg-slate-50/50 px-2 rounded-xl transition-all duration-200 cursor-pointer items-start" onClick={() => navigate(`/tickets/${t.id}`)}>
+                        <div className="mt-1 shrink-0">
+                          {renderPriorityBadge(t.priority)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-bold text-slate-800 truncate">{t.title}</h4>
+                          <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{t.description}</p>
+                          <div className="mt-2 flex items-center gap-2">
+                            {statusBadge(t.status)}
+                            <span className="text-[10px] text-gray-400 font-medium">• #{t.ticket_number}</span>
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-gray-400 shrink-0 font-medium mt-1">{timeAgo(t.created_at)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* RIGHT COLUMN: SYSTEM ALERTS, PROFILE DECK CARD */}
+            <div className="space-y-6">
+              
+              {/* System Alerts Deck */}
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                  <h3 className="text-xs font-bold text-[#9ca3af] tracking-wider uppercase">Pemberitahuan Sistem</h3>
+                  <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">2</span>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex gap-3 items-start p-3 bg-blue-50/40 rounded-xl border border-blue-100/50">
+                    <div className="h-7 w-7 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+                      <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">Pemeliharaan Terjadwal</h4>
+                      <p className="text-[11px] text-gray-400 mt-1 leading-normal">Layanan IT akan mengalami pemeliharaan rutin pada Sabtu besok pukul 02:00 - 04:00 WIB.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 items-start p-3 bg-slate-50 rounded-xl border border-gray-100">
+                    <div className="h-7 w-7 bg-slate-200 text-slate-600 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+                      <svg className="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">Kebijakan Baru HR</h4>
+                      <p className="text-[11px] text-gray-400 mt-1 leading-normal">Silakan periksa pembaharuan pedoman kerja jarak jauh pada menu kelola dokumen panduan.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Profile Deck Card */}
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-6 shadow-sm flex flex-col items-center select-none">
+                <div className="h-16 w-16 rounded-full bg-[#124090] text-white flex items-center justify-center text-2xl font-black shadow-sm mb-4">
+                  {fullName.charAt(0).toUpperCase()}
+                </div>
+                <h3 className="text-sm font-black text-slate-800 text-center truncate w-full">{fullName}</h3>
+                <p className="text-xs text-gray-400 text-center mt-1 w-full truncate">{profile?.department || "Operasional Manufaktur"}</p>
+                
+                <div className="w-full h-px bg-gray-100 my-4" />
+                
+                <div className="w-full space-y-2.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">ID Karyawan</span>
+                    <span className="font-bold text-slate-800">{profile?.employee_id || "—"}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">Lokasi Kerja</span>
+                    <span className="font-bold text-slate-800">Plant B - Epson</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">Hak Akses</span>
+                    <span className="font-bold text-slate-800 capitalize">{role}</span>
+                  </div>
+                </div>
+                
+                <button onClick={handleLogout} className="mt-6 w-full py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs font-bold transition-colors border-none cursor-pointer">
+                  Keluar / Logout
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+
+        </main>
       </div>
-      <div style={s.statSub}>{sub}</div>
     </div>
   );
 }
-
-function AlertItem({ icon, iconBg, title, desc }) {
-  return (
-    <div style={s.alertItem}>
-      <div style={{ ...s.alertIcon, background: iconBg }}>{icon}</div>
-      <div>
-        <div style={s.alertTitle}>{title}</div>
-        <div style={s.alertDesc}>{desc}</div>
-      </div>
-    </div>
-  );
-}
-
-// ── Styles ─────────────────────────────────────────────
-const s = {
-  root: { display: "flex", minHeight: "100vh", background: "#F3F4F6", fontFamily: "'DM Sans','Segoe UI',sans-serif" },
-
-  // Sidebar
-  sidebar: { width: 200, background: "#FFFFFF", borderRight: "1px solid #E5E7EB", display: "flex", flexDirection: "column", flexShrink: 0 },
-  sidebarLogo: { display: "flex", alignItems: "center", gap: 10, padding: "18px 16px", borderBottom: "1px solid #F3F4F6" },
-  logoIcon: { width: 32, height: 32, background: "#EFF6FF", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" },
-  logoText: { fontSize: 15, fontWeight: 700, color: "#111827" },
-  nav: { flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 },
-  navSection: { fontSize: 10, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.08em", padding: "12px 8px 4px", textTransform: "uppercase" },
-  navItem: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", width: "100%", transition: "background 0.12s" },
-  navIcon: { fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 },
-  navLabel: { fontSize: 13, lineHeight: 1.3 },
-  sidebarFooter: { padding: "12px 14px", borderTop: "1px solid #F3F4F6", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
-  avatarSmall: { width: 32, height: 32, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 },
-  footerName: { fontSize: 13, fontWeight: 600, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  footerSub: { fontSize: 11, color: "#9CA3AF" },
-
-  // Main
-  main: { flex: 1, display: "flex", flexDirection: "column", overflow: "auto" },
-  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px 0", marginBottom: 4 },
-  pageTitle: { fontSize: 20, fontWeight: 700, color: "#111827", margin: 0 },
-  bellBtn: { background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 8, display: "flex", alignItems: "center" },
-
-  // Content
-  contentGrid: { display: "flex", gap: 20, padding: "16px 24px 24px", flex: 1 },
-  leftCol: { flex: 1, display: "flex", flexDirection: "column", gap: 16, minWidth: 0 },
-  rightCol: { width: 220, display: "flex", flexDirection: "column", gap: 16, flexShrink: 0 },
-
-  // Stat cards
-  statRow: { display: "flex", gap: 12 },
-  statCard: { flex: 1, background: "#FFFFFF", borderRadius: 12, padding: "16px", border: "1px solid #E5E7EB" },
-  statTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 },
-  statLabel: { fontSize: 12, color: "#6B7280", marginBottom: 4 },
-  statValue: { fontSize: 28, fontWeight: 700, color: "#111827" },
-  statIconWrap: { width: 36, height: 36, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" },
-  statSub: { fontSize: 12, color: "#6B7280" },
-
-  // Section
-  section: { background: "#FFFFFF", borderRadius: 12, padding: 16, border: "1px solid #E5E7EB" },
-  sectionHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-  sectionTitle: { fontSize: 14, fontWeight: 700, color: "#111827", margin: 0 },
-  viewAll: { background: "none", border: "none", fontSize: 12, color: "#2563EB", cursor: "pointer", fontWeight: 500, padding: 0 },
-
-  // Quick Actions
-  actionRow: { display: "flex", gap: 12 },
-  actionCardWhite: { flex: 1, background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 10, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", textAlign: "left" },
-  actionIconWhite: { width: 32, height: 32, background: "#F3F4F6", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 },
-  actionCardBlue: { flex: 1, background: "#2563EB", border: "none", borderRadius: 10, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", textAlign: "left" },
-  actionIconBlue: { width: 32, height: 32, background: "rgba(255,255,255,0.2)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 },
-  actionLabel: { fontSize: 13, fontWeight: 600, color: "#111827" },
-  actionSub: { fontSize: 11, color: "#6B7280", marginTop: 2 },
-  actionLabelBlue: { fontSize: 13, fontWeight: 600, color: "#FFFFFF" },
-  actionSubBlue: { fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 2 },
-
-  // Ticket list
-  ticketList: { display: "flex", flexDirection: "column", gap: 0 },
-  ticketItem: { display: "flex", gap: 12, padding: "12px 0", borderBottom: "1px solid #F3F4F6", cursor: "pointer", alignItems: "flex-start" },
-  ticketIcon: { width: 32, height: 32, background: "#F3F4F6", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0, marginTop: 2 },
-  ticketContent: { flex: 1, minWidth: 0 },
-  ticketTitle: { fontSize: 13, fontWeight: 600, color: "#111827", marginBottom: 2 },
-  ticketDesc: { fontSize: 12, color: "#6B7280", lineHeight: 1.4 },
-  ticketTime: { fontSize: 11, color: "#9CA3AF", flexShrink: 0, marginTop: 2 },
-  emptyState: { fontSize: 13, color: "#9CA3AF", textAlign: "center", padding: "20px 0" },
-
-  // Right column
-  card: { background: "#FFFFFF", borderRadius: 12, padding: 16, border: "1px solid #E5E7EB" },
-  alertBadge: { background: "#2563EB", color: "#fff", fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 10 },
-  alertList: { display: "flex", flexDirection: "column", gap: 12 },
-  alertItem: { display: "flex", gap: 10, alignItems: "flex-start" },
-  alertIcon: { width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 },
-  alertTitle: { fontSize: 12, fontWeight: 600, color: "#111827", marginBottom: 2 },
-  alertDesc: { fontSize: 11, color: "#6B7280", lineHeight: 1.4 },
-
-  // Profile card
-  profileCard: { background: "#FFFFFF", borderRadius: 12, padding: 16, border: "1px solid #E5E7EB", display: "flex", flexDirection: "column", alignItems: "center" },
-  avatarLarge: { width: 60, height: 60, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, marginBottom: 10 },
-  profileName: { fontSize: 14, fontWeight: 700, color: "#111827", textAlign: "center" },
-  profileDept: { fontSize: 12, color: "#6B7280", marginTop: 2, marginBottom: 12, textAlign: "center" },
-  profileDivider: { width: "100%", height: 1, background: "#F3F4F6", marginBottom: 12 },
-  profileRow: { display: "flex", justifyContent: "space-between", width: "100%", marginBottom: 8 },
-  profileKey: { fontSize: 12, color: "#6B7280" },
-  profileVal: { fontSize: 12, fontWeight: 600, color: "#111827" },
-  logoutBtn: { marginTop: 12, width: "100%", padding: "8px", background: "#FEF2F2", color: "#DC2626", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" },
-};

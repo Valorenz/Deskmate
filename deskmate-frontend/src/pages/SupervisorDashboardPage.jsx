@@ -1,11 +1,11 @@
 // src/pages/SupervisorDashboardPage.jsx
 // -------------------------------------------------------
-// Supervisor Dashboard DeskMate
+// Supervisor Dashboard DeskMate (Redesigned with Premium Chatbot Aesthetics)
 // Sesuai desain screenshot: 4 stat cards, line chart ticket trends,
-// donut chart SLA compliance, team performance table, quick actions
+// donut chart SLA compliance, team performance table, quick actions, Tailwind CSS
 // -------------------------------------------------------
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch, getFullName, getRole, logout } from "../utils/auth";
 
@@ -40,7 +40,6 @@ function LineChart({ data, color = "#2563EB", height = 120 }) {
 
 // ── Donut Chart (SVG) ──────────────────────────────────
 function DonutChart({ segments }) {
-  // segments: [{value, color, label}]
   const total = segments.reduce((s, x) => s + x.value, 0) || 1;
   const r = 60, cx = 80, cy = 80, stroke = 28;
   let offset = 0;
@@ -80,6 +79,12 @@ export default function SupervisorDashboardPage() {
   const [trendFilter, setTrendFilter] = useState("Last 7 Days");
   const [deptFilter, setDeptFilter] = useState("All Departments");
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
 
   // Mock trend data (7 days)
   const trendData = [32, 45, 58, 62, 48, 35, 20];
@@ -98,7 +103,9 @@ export default function SupervisorDashboardPage() {
     { value: 10, color: "#EF4444", label: "Breached" },
   ];
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
   async function loadData() {
     setLoading(true);
@@ -118,345 +125,448 @@ export default function SupervisorDashboardPage() {
           avgResponse: "1.4h",
         });
       }
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   }
 
   const statusBadge = (status) => {
-    const map = { Online: { bg: "#DCFCE7", color: "#15803D" }, Busy: { bg: "#FEF9C3", color: "#B45309" }, Offline: { bg: "#F3F4F6", color: "#6B7280" } };
+    const map = {
+      Online: { bg: "#DCFCE7", color: "#15803D" },
+      Busy: { bg: "#FEF9C3", color: "#B45309" },
+      Offline: { bg: "#F3F4F6", color: "#6B7280" }
+    };
     const st = map[status] || map.Offline;
-    return <span style={{ ...s.statusBadge, background: st.bg, color: st.color }}>{status}</span>;
+    return (
+      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full" style={{ background: st.bg, color: st.color }}>
+        {status}
+      </span>
+    );
   };
 
+  const fullName = profile?.full_name || getFullName() || "User";
+
+  // ── FITUR CURSOR SPARKS (GEMINI STYLE EFFECT) ──
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (Math.random() > 0.25) return;
+
+      const spark = document.createElement('div');
+      spark.className = 'cursor-spark';
+
+      const size = Math.random() * 8 + 4;
+      spark.style.width = `${size}px`;
+      spark.style.height = `${size}px`;
+
+      spark.style.left = `${e.clientX}px`;
+      spark.style.top = `${e.clientY}px`;
+
+      const colors = [
+        'radial-gradient(circle, #8ab4f8 10%, rgba(138,180,248,0) 80%)',
+        'radial-gradient(circle, #c58af9 10%, rgba(197,138,249,0) 80%)',
+        'radial-gradient(circle, #f382ac 10%, rgba(243,130,172,0) 80%)',
+        'radial-gradient(circle, #a8dab5 10%, rgba(168,218,181,0) 80%)',
+      ];
+      spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+      const driftX = (Math.random() - 0.5) * 60;
+      const driftY = (Math.random() - 0.5) * 60;
+      spark.style.setProperty('--drift-x', `${driftX}px`);
+      spark.style.setProperty('--drift-y', `${driftY}px`);
+
+      document.body.appendChild(spark);
+
+      setTimeout(() => {
+        spark.remove();
+      }, 800);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
   return (
-    <div style={s.root}>
-      {/* ── SIDEBAR ── */}
-      <aside style={s.sidebar}>
-        <div style={s.sidebarLogo}>
-          <div style={s.logoIcon}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#2563EB"/>
+    <div className="flex h-screen w-full bg-[#f4f6fa] font-sans text-[#111827] overflow-hidden relative">
+      {/* ─── STYLE OVERRIDE FOR HELVETICA NEUE & CURSOR SPARKS ─── */}
+      <style>{`
+        * {
+          font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+        }
+        @keyframes spark-fade {
+          0% {
+            transform: translate(0, 0) scale(0) rotate(0deg);
+            opacity: 0;
+          }
+          15% {
+            transform: translate(0, 0) scale(1) rotate(45deg);
+            opacity: 0.95;
+          }
+          100% {
+            transform: translate(var(--drift-x), var(--drift-y)) scale(0) rotate(180deg);
+            opacity: 0;
+          }
+        }
+        .cursor-spark {
+          position: fixed;
+          pointer-events: none;
+          z-index: 9999;
+          mix-blend-mode: screen;
+          animation: spark-fade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          clip-path: polygon(50% 0%, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0% 50%, 37% 37%);
+        }
+      `}</style>
+
+      {/* ─── TOP HEADER (MATCHES CHATBOT HEADER) ─── */}
+      <header className="fixed top-0 left-0 right-0 flex h-14 md:h-16 items-center justify-between border-b border-[#d1d5db] bg-white px-3 md:px-6 shadow-sm z-30">
+        <div className="flex items-center gap-2 md:gap-4">
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+            className="rounded-lg p-2 text-[#6b7280] hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+          >
+            <svg className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
-          </div>
-          <span style={s.logoText}>DeskMate</span>
-        </div>
-        <nav style={s.nav}>
-          <NavItem icon="🏠" label="Supervisor Dashboard" active />
-          <NavItem icon="🤖" label="AI Chat Interface" onClick={() => navigate("/chat")} />
-          <NavItem icon="☰" label="Employee Ticket List" onClick={() => navigate("/tickets")} />
-          <NavItem icon="+" label="Create Ticket Form" onClick={() => navigate("/tickets/create")} />
-          <div style={s.navSection}>ADMIN</div>
-          <NavItem icon="📄" label="Admin Document Management" onClick={() => navigate("/documents")} />
-          <NavItem icon="⚙" label="Admin User Management" onClick={() => navigate("/users")} />
-        </nav>
-        <div style={s.sidebarFooter} onClick={() => navigate("/profile")}>
-          <div style={s.avatarSmall}>{profile?.full_name?.charAt(0)?.toUpperCase() || "U"}</div>
-          <div>
-            <div style={s.footerName}>{profile?.full_name || getFullName() || "User"}</div>
-            <div style={s.footerSub}>Profile & Settings</div>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── MAIN ── */}
-      <main style={s.main}>
-        {/* Header */}
-        <div style={s.header}>
-          <h1 style={s.pageTitle}>Supervisor Dashboard</h1>
-          <div style={s.headerRight}>
-            <button style={s.bellBtn}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-            </button>
-            <button style={s.newReportBtn}>+ New Report</button>
+          </button>
+          <div className="flex flex-col">
+            <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-[#003399] leading-none">EPSON</h1>
+            <span className="text-[9px] md:text-[10px] font-bold text-[#6b7280] tracking-wider mt-0.5">DESKMATE AI</span>
           </div>
         </div>
 
-        <div style={s.content}>
-          {/* ── STAT CARDS ── */}
-          <div style={s.statRow}>
-            <StatCard
-              label="ALL OPEN TICKETS"
-              value={loading ? "—" : stats.total}
-              trend="+12%"
-              trendUp
-              icon="📨"
-              iconBg="#EFF6FF"
-            />
-            <StatCard
-              label="OVERDUE / SLA BREACHES"
-              value={loading ? "—" : stats.overdue}
-              trend="+4%"
-              trendUp
-              trendBad
-              icon="⚠"
-              iconBg="#FEF2F2"
-              iconColor="#DC2626"
-            />
-            <StatCard
-              label="UNASSIGNED"
-              value={loading ? "—" : stats.unassigned}
-              trend="-8%"
-              trendUp={false}
-              icon="👤"
-              iconBg="#F5F3FF"
-              iconColor="#7C3AED"
-            />
-            <StatCard
-              label="AVG RESPONSE TIME"
-              value="1.4h"
-              trend="-15m"
-              trendUp={false}
-              icon="⏱"
-              iconBg="#F0FDF4"
-              iconColor="#15803D"
-            />
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Search Button */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+
+          {/* Settings Button */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+
+          {/* Bell / Toggle Panel Button */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </button>
+
+          <div className="h-6 w-px bg-gray-300 mx-1 md:mx-2 hidden sm:block"></div>
+          
+          <div onClick={() => navigate("/profile")} className="flex items-center gap-1 md:gap-2 pl-1 cursor-pointer hover:opacity-80 transition-opacity select-none">
+            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
+              {fullName.charAt(0).toUpperCase()}
+            </div>
+            <div className="hidden md:flex flex-col text-left">
+              <span className="text-xs font-bold text-[#111827]">{fullName}</span>
+              <span className="text-[10px] text-[#6b7280]">
+                {role === "admin" ? "Admin" : role === "supervisor" ? "Supervisor" : "Karyawan"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── MAIN LAYOUT CONTAINER ─── */}
+      <div className="flex flex-1 pt-14 md:pt-16 overflow-hidden relative w-full h-full">
+        {isSidebarOpen && (
+          <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+        )}
+
+        {/* ── SIDEBAR PANEL LEFT ── */}
+        <div className={`fixed md:relative inset-y-0 left-0 z-40 bg-[#f8fafd] border-r border-gray-200/80 flex flex-col transition-all duration-300 ease-in-out w-[280px] md:w-64 flex-shrink-0 ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:-ml-64 md:translate-x-0 md:opacity-100'}`}>
+          <div className="p-4 flex-1 overflow-y-auto relative">
+            <button onClick={() => navigate("/chat")} className="w-full rounded-full border border-[#d1d5db] bg-white text-[#111827] py-2.5 text-sm font-semibold transition hover:bg-gray-50 mb-6 shadow-sm">+ Chat Baru</button>
+            
+            <p className="text-xs font-bold text-[#9ca3af] mb-3 px-1 tracking-wider uppercase">Menu Navigasi</p>
+            <nav className="space-y-1 mb-6">
+              <span className="flex items-center gap-3 bg-[#e5e7eb] text-[#111827] rounded-lg p-3 text-sm font-semibold cursor-default">
+                <span>Dashboard Utama</span>
+              </span>
+              <button onClick={() => navigate("/chat")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>AI Helpdesk Chat</span>
+              </button>
+              <button onClick={() => navigate("/tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Daftar Tiket Saya</span>
+              </button>
+              <button onClick={() => navigate("/tickets/create")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Buat Tiket Baru</span>
+              </button>
+
+              {/* Rute Khusus Supervisor */}
+              {(role === "supervisor" || role === "admin") && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Supervisor</p>
+                  <button onClick={() => navigate("/all-tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Semua Tiket Unit</span>
+                  </button>
+                </>
+              )}
+
+              {/* Rute Khusus Admin */}
+              {role === "admin" && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Admin</p>
+                  <button onClick={() => navigate("/documents")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Kelola Dokumen RAG</span>
+                  </button>
+                  <button onClick={() => navigate("/users")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Kelola Pengguna</span>
+                  </button>
+                </>
+              )}
+            </nav>
+          </div>
+          
+          <div className="p-4 border-t border-gray-200/80 flex items-center gap-3 cursor-pointer hover:bg-gray-100/50 transition-colors" onClick={() => navigate("/profile")}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs">
+              {fullName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-[#111827] truncate">{fullName}</div>
+              <div className="text-[10px] text-[#6b7280]">Profile & Settings</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── AREA UTAMA KONTEN DASHBOARD (PREMIUM CORPORATE DECK STYLE) ── */}
+        <main className="flex-1 overflow-y-auto bg-[#f0f4f9] p-4 md:p-6 space-y-6">
+          
+          {/* Section Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-extrabold text-[#124090] tracking-widest uppercase">Epson Management Hub</span>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mt-1">Supervisor Dashboard</h2>
+              <p className="text-xs text-[#6b7280] mt-0.5">Analisis performa penyelesaian SLA, beban kerja tim helpdesk IT, dan kelola eskalasi.</p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button onClick={() => navigate("/all-tickets")} className="bg-[#124090] hover:bg-[#0e306e] text-white text-xs font-bold px-4 py-2 rounded-xl transition duration-200 shadow-sm border-none cursor-pointer">
+                + Semua Tiket Unit
+              </button>
+            </div>
           </div>
 
-          {/* ── CHARTS ROW ── */}
-          <div style={s.chartsRow}>
-            {/* Line Chart */}
-            <div style={s.chartCard}>
-              <div style={s.chartHeader}>
-                <h2 style={s.chartTitle}>Ticket Volume Trends</h2>
-                <div style={s.filterWrap}>
-                  <select value={trendFilter} onChange={(e) => setTrendFilter(e.target.value)} style={s.filterSelect}>
-                    <option>Last 7 Days</option>
-                    <option>Last 30 Days</option>
-                    <option>Last 90 Days</option>
-                  </select>
-                  <span style={s.filterArrow}>▾</span>
+          <div className="flex flex-col gap-6">
+            
+            {/* ── STAT CARDS ROW ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-blue-600 tracking-wider uppercase">All Open Tickets</span>
+                  <h3 className="text-3xl font-black text-slate-800 mt-1">{loading ? "—" : stats.total}</h3>
+                  <p className="text-[10px] text-[#6b7280] mt-1">Total beban tiket aktif</p>
+                </div>
+                <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
                 </div>
               </div>
 
-              {/* Y-axis labels */}
-              <div style={s.lineChartWrap}>
-                <div style={s.yAxis}>
-                  {[60, 50, 40, 30, 20, 10].map((v) => (
-                    <span key={v} style={s.yLabel}>{v}</span>
-                  ))}
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-red-600 tracking-wider uppercase">Overdue / SLA Breaches</span>
+                  <h3 className="text-3xl font-black text-slate-800 mt-1">{loading ? "—" : stats.overdue}</h3>
+                  <p className="text-[10px] text-[#6b7280] mt-1">Tingkat eskalasi kritis</p>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <LineChart data={trendData} color="#2563EB" height={180} />
-                  {/* X-axis */}
-                  <div style={s.xAxis}>
-                    {trendLabels.map((l) => <span key={l} style={s.xLabel}>{l}</span>)}
+                <div className="h-10 w-10 bg-red-50 text-red-600 rounded-xl flex items-center justify-center shrink-0">
+                  <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-purple-600 tracking-wider uppercase">Unassigned</span>
+                  <h3 className="text-3xl font-black text-slate-800 mt-1">{loading ? "—" : stats.unassigned}</h3>
+                  <p className="text-[10px] text-[#6b7280] mt-1">Belum ditangani teknisi</p>
+                </div>
+                <div className="h-10 w-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center shrink-0">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-green-600 tracking-wider uppercase">Avg Response Time</span>
+                  <h3 className="text-3xl font-black text-slate-800 mt-1">{stats.avgResponse}</h3>
+                  <p className="text-[10px] text-[#6b7280] mt-1">Waktu tanggap SLA rata-rata</p>
+                </div>
+                <div className="h-10 w-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center shrink-0">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* ── CHARTS ROW ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Line Chart Card */}
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-bold text-[#111827]">Ticket Volume Trends</h3>
+                  <div className="relative">
+                    <select value={trendFilter} onChange={(e) => setTrendFilter(e.target.value)} className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-[#374151] outline-none cursor-pointer pr-6 appearance-none">
+                      <option>Last 7 Days</option>
+                      <option>Last 30 Days</option>
+                      <option>Last 90 Days</option>
+                    </select>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-[#9ca3af] pointer-events-none">▼</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 items-stretch mt-6">
+                  <div className="flex flex-col justify-between text-[10px] text-gray-400 pb-5 text-right w-6 shrink-0">
+                    {[60, 50, 40, 30, 20, 10].map((v) => (
+                      <span key={v}>{v}</span>
+                    ))}
+                  </div>
+                  <div className="flex-1">
+                    <LineChart data={trendData} color="#124090" height={180} />
+                    <div className="flex justify-between mt-2 pl-4 text-[10px] text-gray-400">
+                      {trendLabels.map((l) => <span key={l}>{l}</span>)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Donut Chart Card */}
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-bold text-[#111827]">SLA Compliance Rate</h3>
+                  <div className="relative">
+                    <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-[#374151] outline-none cursor-pointer pr-6 appearance-none">
+                      <option>All Departments</option>
+                      <option>IT & Network</option>
+                      <option>HR</option>
+                      <option>Facilities</option>
+                    </select>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-[#9ca3af] pointer-events-none">▼</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-8 py-4">
+                  <DonutChart segments={slaSegments} />
+                  <div className="flex flex-col gap-3 justify-center">
+                    {slaSegments.map((seg) => (
+                      <div key={seg.label} className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ background: seg.color }} />
+                        <span className="text-xs font-semibold text-slate-700">{seg.label} ({seg.value}%)</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Donut Chart */}
-            <div style={s.chartCard}>
-              <div style={s.chartHeader}>
-                <h2 style={s.chartTitle}>SLA Compliance</h2>
-                <div style={s.filterWrap}>
-                  <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} style={s.filterSelect}>
-                    <option>All Departments</option>
-                    <option>IT & Network</option>
-                    <option>HR</option>
-                    <option>Facilities</option>
-                  </select>
-                  <span style={s.filterArrow}>▾</span>
+            {/* ── BOTTOM ROW (TEAM PERFORMANCE & QUICK ACTIONS) ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Team Performance Table Card */}
+              <div className="lg:col-span-2 bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm overflow-hidden">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xs font-bold text-[#9ca3af] tracking-wider uppercase">Team Performance</h3>
+                  <button onClick={() => navigate("/tickets")} className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors border-none bg-transparent cursor-pointer">
+                    View Full Report
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50">
+                        <th className="p-3 text-[10px] font-bold text-[#9ca3af] uppercase tracking-wider border-b border-gray-100">Agent</th>
+                        <th className="p-3 text-[10px] font-bold text-[#9ca3af] uppercase tracking-wider border-b border-gray-100">Open Tickets</th>
+                        <th className="p-3 text-[10px] font-bold text-[#9ca3af] uppercase tracking-wider border-b border-gray-100">Resolved (7D)</th>
+                        <th className="p-3 text-[10px] font-bold text-[#9ca3af] uppercase tracking-wider border-b border-gray-100">CSAT Rate</th>
+                        <th className="p-3 text-[10px] font-bold text-[#9ca3af] uppercase tracking-wider border-b border-gray-100">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {teamData.map((agent) => (
+                        <tr key={agent.name} className="hover:bg-slate-50/30 transition-colors">
+                          <td className="p-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-7 h-7 rounded-full text-white flex items-center justify-center font-bold text-xs shrink-0" style={{ background: agent.color }}>
+                                {agent.name.charAt(0)}
+                              </div>
+                              <span className="text-xs font-bold text-slate-800">{agent.name}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-xs text-slate-600 font-semibold">{agent.open}</td>
+                          <td className="p-3 text-xs text-slate-600 font-semibold">{agent.resolved}</td>
+                          <td className="p-3 text-xs text-slate-600 font-semibold">{agent.csat}</td>
+                          <td className="p-3">{statusBadge(agent.status)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-              <div style={s.donutWrap}>
-                <DonutChart segments={slaSegments} />
-                <div style={s.donutLegend}>
-                  {slaSegments.map((seg) => (
-                    <div key={seg.label} style={s.legendItem}>
-                      <span style={{ ...s.legendDot, background: seg.color }} />
-                      <span style={s.legendLabel}>{seg.label}</span>
-                    </div>
-                  ))}
+
+              {/* Quick Actions Card */}
+              <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-[#9ca3af] tracking-wider uppercase mb-4">Quick Actions</h3>
+                  
+                  <div className="space-y-3">
+                    <button onClick={() => navigate("/tickets")} className="w-full flex items-center gap-3 p-3 border border-gray-100 hover:border-blue-400 hover:shadow-sm rounded-xl transition duration-200 text-left bg-white cursor-pointer group">
+                      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 group-hover:bg-blue-50">
+                        <svg className="h-4 w-4 text-[#124090]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                      </div>
+                      <span className="text-xs font-bold text-slate-700 flex-1">View All Tickets</span>
+                      <span className="text-gray-400 text-xs font-bold group-hover:translate-x-1 transition-transform">→</span>
+                    </button>
+
+                    <button onClick={() => navigate("/all-tickets")} className="w-full flex items-center gap-3 p-3 border border-gray-100 hover:border-blue-400 hover:shadow-sm rounded-xl transition duration-200 text-left bg-white cursor-pointer group">
+                      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 group-hover:bg-blue-50">
+                        <svg className="h-4 w-4 text-[#124090]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                      </div>
+                      <span className="text-xs font-bold text-slate-700 flex-1">Reassign Tickets</span>
+                      <span className="text-gray-400 text-xs font-bold group-hover:translate-x-1 transition-transform">→</span>
+                    </button>
+
+                    <button onClick={() => navigate("/documents")} className="w-full flex items-center gap-3 p-3 border border-gray-100 hover:border-blue-400 hover:shadow-sm rounded-xl transition duration-200 text-left bg-white cursor-pointer group">
+                      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 group-hover:bg-blue-50">
+                        <svg className="h-4 w-4 text-[#124090]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                      </div>
+                      <span className="text-xs font-bold text-slate-700 flex-1">Internal Guidelines</span>
+                      <span className="text-gray-400 text-xs font-bold group-hover:translate-x-1 transition-transform">→</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-gray-100 rounded-xl mt-6">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">SLA Status Info</h4>
+                  <p className="text-[11px] text-[#6b7280] leading-relaxed mt-1">92% dari tiket terselesaikan dalam batas waktu SLA disepakati minggu ini.</p>
                 </div>
               </div>
+
             </div>
+
           </div>
 
-          {/* ── BOTTOM ROW ── */}
-          <div style={s.bottomRow}>
-            {/* Team Performance */}
-            <div style={s.teamCard}>
-              <div style={s.teamHeader}>
-                <h2 style={s.chartTitle}>Team Performance</h2>
-                <button style={s.viewReportBtn} onClick={() => navigate("/tickets")}>View Full Report</button>
-              </div>
-              <table style={s.table}>
-                <thead>
-                  <tr style={s.thead}>
-                    <th style={s.th}>AGENT</th>
-                    <th style={s.th}>OPEN</th>
-                    <th style={s.th}>RESOLVED (7D)</th>
-                    <th style={s.th}>CSAT</th>
-                    <th style={s.th}>STATUS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {teamData.map((agent) => (
-                    <tr key={agent.name} style={s.tr}>
-                      <td style={s.td}>
-                        <div style={s.agentCell}>
-                          <div style={{ ...s.agentAvatar, background: agent.color }}>
-                            {agent.name.charAt(0)}
-                          </div>
-                          <span style={s.agentName}>{agent.name}</span>
-                        </div>
-                      </td>
-                      <td style={s.td}><span style={s.tdText}>{agent.open}</span></td>
-                      <td style={s.td}><span style={s.tdText}>{agent.resolved}</span></td>
-                      <td style={s.td}><span style={s.tdText}>{agent.csat}</span></td>
-                      <td style={s.td}>{statusBadge(agent.status)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Quick Actions */}
-            <div style={s.quickCard}>
-              <h2 style={s.chartTitle}>Quick Actions</h2>
-              <div style={s.quickList}>
-                <QuickAction icon="☰" label="View All Tickets" onClick={() => navigate("/tickets")} />
-                <QuickAction icon="🔄" label="Reassign Tickets" onClick={() => navigate("/tickets")} />
-                <QuickAction icon="📄" label="Internal Guidelines" onClick={() => navigate("/documents")} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
-
-// ── Sub Components ──────────────────────────────────────
-
-function NavItem({ icon, label, active, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      style={{ ...s.navItem, background: active ? "#EFF6FF" : hovered ? "#F9FAFB" : "transparent", color: active ? "#2563EB" : "#374151", fontWeight: active ? 600 : 400 }}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <span style={s.navIcon}>{icon}</span>
-      <span style={s.navLabel}>{label}</span>
-    </button>
-  );
-}
-
-function StatCard({ label, value, trend, trendUp, trendBad, icon, iconBg, iconColor = "#2563EB" }) {
-  const trendColor = trendBad ? (trendUp ? "#DC2626" : "#15803D") : (trendUp ? "#DC2626" : "#15803D");
-  const trendArrow = trendUp ? "↑" : "↓";
-  return (
-    <div style={s.statCard}>
-      <div style={s.statTop}>
-        <div style={s.statLabel}>{label}</div>
-        <div style={{ ...s.statIconWrap, background: iconBg }}>
-          <span style={{ fontSize: 16, color: iconColor }}>{icon}</span>
-        </div>
-      </div>
-      <div style={s.statValue}>{value}</div>
-      <div style={{ ...s.statTrend, color: trendColor }}>
-        {trendArrow} {trend}
+        </main>
       </div>
     </div>
   );
 }
-
-function QuickAction({ icon, label, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      style={{ ...s.quickItem, background: hovered ? "#F9FAFB" : "#FFFFFF" }}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div style={s.quickIcon}>{icon}</div>
-      <span style={s.quickLabel}>{label}</span>
-      <span style={s.quickArrow}>→</span>
-    </button>
-  );
-}
-
-// ── Styles ──────────────────────────────────────────────
-const s = {
-  root: { display: "flex", minHeight: "100vh", background: "#F3F4F6", fontFamily: "'DM Sans','Segoe UI',sans-serif" },
-  sidebar: { width: 200, background: "#FFFFFF", borderRight: "1px solid #E5E7EB", display: "flex", flexDirection: "column", flexShrink: 0 },
-  sidebarLogo: { display: "flex", alignItems: "center", gap: 10, padding: "18px 16px", borderBottom: "1px solid #F3F4F6" },
-  logoIcon: { width: 32, height: 32, background: "#EFF6FF", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" },
-  logoText: { fontSize: 15, fontWeight: 700, color: "#111827" },
-  nav: { flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 },
-  navSection: { fontSize: 10, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.08em", padding: "12px 8px 4px", textTransform: "uppercase" },
-  navItem: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", width: "100%", transition: "background 0.12s" },
-  navIcon: { fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 },
-  navLabel: { fontSize: 13, lineHeight: 1.3 },
-  sidebarFooter: { padding: "12px 14px", borderTop: "1px solid #F3F4F6", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
-  avatarSmall: { width: 32, height: 32, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 },
-  footerName: { fontSize: 13, fontWeight: 600, color: "#111827" },
-  footerSub: { fontSize: 11, color: "#9CA3AF" },
-  main: { flex: 1, display: "flex", flexDirection: "column", overflow: "auto" },
-  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px 0" },
-  pageTitle: { fontSize: 20, fontWeight: 700, color: "#111827", margin: 0 },
-  headerRight: { display: "flex", alignItems: "center", gap: 10 },
-  bellBtn: { background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 8, display: "flex" },
-  newReportBtn: { background: "#2563EB", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" },
-  content: { padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: 16 },
-
-  // Stat cards
-  statRow: { display: "flex", gap: 12 },
-  statCard: { flex: 1, background: "#FFFFFF", borderRadius: 12, padding: "16px", border: "1px solid #E5E7EB" },
-  statTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
-  statLabel: { fontSize: 10, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.06em", textTransform: "uppercase", lineHeight: 1.4, maxWidth: 100 },
-  statIconWrap: { width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  statValue: { fontSize: 32, fontWeight: 700, color: "#111827", lineHeight: 1.1, marginBottom: 4 },
-  statTrend: { fontSize: 12, fontWeight: 600 },
-
-  // Charts
-  chartsRow: { display: "flex", gap: 16 },
-  chartCard: { flex: 1, background: "#FFFFFF", borderRadius: 12, border: "1px solid #E5E7EB", padding: "16px 20px" },
-  chartHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  chartTitle: { fontSize: 14, fontWeight: 700, color: "#111827", margin: 0 },
-  filterWrap: { position: "relative" },
-  filterSelect: { padding: "5px 24px 5px 10px", borderRadius: 8, border: "1px solid #E5E7EB", fontSize: 12, color: "#374151", background: "#FFFFFF", appearance: "none", cursor: "pointer", fontFamily: "inherit" },
-  filterArrow: { position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 9, color: "#9CA3AF", pointerEvents: "none" },
-  lineChartWrap: { display: "flex", gap: 8, alignItems: "stretch" },
-  yAxis: { display: "flex", flexDirection: "column", justifyContent: "space-between", paddingBottom: 20, gap: 0 },
-  yLabel: { fontSize: 10, color: "#9CA3AF", textAlign: "right", lineHeight: 1 },
-  xAxis: { display: "flex", justifyContent: "space-between", paddingLeft: 4, marginTop: 2 },
-  xLabel: { fontSize: 10, color: "#9CA3AF" },
-  donutWrap: { display: "flex", alignItems: "center", justifyContent: "center", gap: 24, padding: "8px 0" },
-  donutLegend: { display: "flex", flexDirection: "column", gap: 10 },
-  legendItem: { display: "flex", alignItems: "center", gap: 8 },
-  legendDot: { width: 10, height: 10, borderRadius: "50%", flexShrink: 0 },
-  legendLabel: { fontSize: 12, color: "#374151" },
-
-  // Bottom row
-  bottomRow: { display: "flex", gap: 16 },
-  teamCard: { flex: 1, background: "#FFFFFF", borderRadius: 12, border: "1px solid #E5E7EB", padding: "16px 20px", overflow: "hidden" },
-  teamHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  viewReportBtn: { background: "none", border: "none", fontSize: 12, color: "#2563EB", fontWeight: 500, cursor: "pointer", padding: 0 },
-  table: { width: "100%", borderCollapse: "collapse" },
-  thead: { background: "#F9FAFB" },
-  th: { padding: "8px 10px", fontSize: 10, fontWeight: 700, color: "#9CA3AF", textAlign: "left", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid #F3F4F6" },
-  tr: { borderBottom: "1px solid #F9FAFB" },
-  td: { padding: "10px 10px", verticalAlign: "middle" },
-  tdText: { fontSize: 13, color: "#374151" },
-  agentCell: { display: "flex", alignItems: "center", gap: 8 },
-  agentAvatar: { width: 28, height: 28, borderRadius: "50%", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 },
-  agentName: { fontSize: 13, fontWeight: 600, color: "#111827" },
-  statusBadge: { fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20 },
-
-  // Quick actions
-  quickCard: { width: 220, background: "#FFFFFF", borderRadius: 12, border: "1px solid #E5E7EB", padding: "16px", flexShrink: 0 },
-  quickList: { display: "flex", flexDirection: "column", gap: 6, marginTop: 12 },
-  quickItem: { display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid #E5E7EB", borderRadius: 8, cursor: "pointer", transition: "background 0.12s", width: "100%", textAlign: "left" },
-  quickIcon: { width: 28, height: 28, background: "#F3F4F6", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 },
-  quickLabel: { flex: 1, fontSize: 13, fontWeight: 500, color: "#374151" },
-  quickArrow: { fontSize: 14, color: "#9CA3AF" },
-};

@@ -4,15 +4,126 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// Utility to format markdown and custom safety/danger tags into rich, high-end HTML layouts
+function formatMessageContent(text) {
+  if (!text) return "";
+  
+  const lines = text.split('\n');
+  const formattedLines = [];
+  
+  let inList = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim();
+    if (!line) {
+      if (inList) {
+        formattedLines.push('</ul>');
+        inList = false;
+      }
+      formattedLines.push('<div class="h-2"></div>');
+      continue;
+    }
+    
+    // Convert bold tags **text** into <strong> tags
+    let processedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Check for Danger Alerts (🚨 or contains BAHAYA:)
+    if (line.startsWith('🚨') || line.toUpperCase().includes('BAHAYA:')) {
+      if (inList) {
+        formattedLines.push('</ul>');
+        inList = false;
+      }
+      const cleanText = processedLine.replace(/^🚨\s*/, '').replace(/^BAHAYA:\s*/i, '');
+      formattedLines.push(`
+        <div class="my-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-gradient-to-br from-red-50/90 to-red-100/50 p-4 text-red-950 shadow-sm backdrop-blur-sm select-text text-left">
+          <div class="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white text-[9px] font-black tracking-widest shrink-0">!</div>
+          <div>
+            <h4 class="text-[10px] font-black tracking-wider uppercase text-red-800">BAHAYA / HAZARD INFO</h4>
+            <p class="text-xs md:text-sm mt-1 leading-relaxed text-red-900 font-medium">${cleanText}</p>
+          </div>
+        </div>
+      `);
+      continue;
+    }
+    
+    // Check for Safety Warning Alerts (⚠️ or contains PERINGATAN:)
+    if (line.startsWith('⚠️') || line.toUpperCase().includes('PERINGATAN KESELAMATAN') || line.toUpperCase().includes('PERINGATAN:')) {
+      if (inList) {
+        formattedLines.push('</ul>');
+        inList = false;
+      }
+      const cleanText = processedLine.replace(/^⚠️\s*/, '').replace(/^PERINGATAN:\s*/i, '').replace(/^PERINGATAN KESELAMATAN:\s*/i, '');
+      formattedLines.push(`
+        <div class="my-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/90 to-amber-100/50 p-4 text-amber-950 shadow-sm backdrop-blur-sm select-text text-left">
+          <div class="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-black tracking-widest shrink-0">!</div>
+          <div>
+            <h4 class="text-[10px] font-black tracking-wider uppercase text-amber-800">PERINGATAN KESELAMATAN / SAFETY WARNING</h4>
+            <p class="text-xs md:text-sm mt-1 leading-relaxed text-amber-900 font-medium">${cleanText}</p>
+          </div>
+        </div>
+      `);
+      continue;
+    }
+    
+    // Check for bullet list items
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      if (!inList) {
+        formattedLines.push('<ul class="list-disc pl-5 space-y-1.5 my-3 text-left">');
+        inList = true;
+      }
+      const cleanText = processedLine.substring(2);
+      formattedLines.push(`<li class="text-xs md:text-sm text-[#374151] leading-relaxed">${cleanText}</li>`);
+      continue;
+    }
+    
+    // Check for numbered list items (e.g. 1. , 2. )
+    const numberedMatch = line.match(/^(\d+)\.\s+(.*)/);
+    if (numberedMatch) {
+      if (inList) {
+        formattedLines.push('</ul>');
+        inList = false;
+      }
+      const num = numberedMatch[1];
+      const cleanText = numberedMatch[2].replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      formattedLines.push(`
+        <div class="flex items-start gap-3 my-3 text-left">
+          <div class="flex h-5 w-5 md:h-6 md:w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 border border-blue-200 text-[#124090] text-[10px] md:text-xs font-black shadow-sm">${num}</div>
+          <p class="text-xs md:text-sm text-[#374151] leading-relaxed pt-0.5">${cleanText}</p>
+        </div>
+      `);
+      continue;
+    }
+    
+    // Regular plain paragraph line
+    if (inList) {
+      formattedLines.push('</ul>');
+      inList = false;
+    }
+    formattedLines.push(`<p class="text-xs md:text-sm text-[#374151] leading-relaxed text-left my-1.5">${processedLine}</p>`);
+  }
+  
+  if (inList) {
+    formattedLines.push('</ul>');
+  }
+  
+  return formattedLines.join('\n');
+}
+
 export default function ChatPage() {
   const navigate = useNavigate();
   const [input, setInput] = useState('');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
   const [sessionId, setSessionId] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [tickets, setTickets] = useState([]);
-  
+
   // ── FITUR DINAMISASI PROFIL ──
   const [fullName, setFullName] = useState("User");
 
@@ -29,9 +140,7 @@ export default function ChatPage() {
   const fileInputRef = useRef(null);
   const menuRef = useRef(null);
 
-  const [messages, setMessages] = useState([
-    { role: 'ai', content: 'Halo, Teknisi. Saya DeskMate AI. Ada kendala teknis atau kode error mesin yang bisa saya bantu identifikasi hari ini?', image: null }
-  ]);
+  const [messages, setMessages] = useState([]);
 
   const messagesEndRef = useRef(null);
 
@@ -91,10 +200,57 @@ export default function ChatPage() {
     loadInitialData();
   }, []);
 
+  // ── FITUR CURSOR SPARKS (GEMINI STYLE EFFECT) ──
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      // Spawn rate limiter (approx. 25% of moves)
+      if (Math.random() > 0.25) return;
+
+      const spark = document.createElement('div');
+      spark.className = 'cursor-spark';
+
+      // Randomize size (4px to 12px)
+      const size = Math.random() * 8 + 4;
+      spark.style.width = `${size}px`;
+      spark.style.height = `${size}px`;
+
+      // Position directly at cursor coords
+      spark.style.left = `${e.clientX}px`;
+      spark.style.top = `${e.clientY}px`;
+
+      // Gemini Gradient Colors
+      const colors = [
+        'radial-gradient(circle, #8ab4f8 10%, rgba(138,180,248,0) 80%)', // Blue
+        'radial-gradient(circle, #c58af9 10%, rgba(197,138,249,0) 80%)', // Purple
+        'radial-gradient(circle, #f382ac 10%, rgba(243,130,172,0) 80%)', // Pink
+        'radial-gradient(circle, #a8dab5 10%, rgba(168,218,181,0) 80%)', // Green
+      ];
+      spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+      // Drift translations
+      const driftX = (Math.random() - 0.5) * 60;
+      const driftY = (Math.random() - 0.5) * 60;
+      spark.style.setProperty('--drift-x', `${driftX}px`);
+      spark.style.setProperty('--drift-y', `${driftY}px`);
+
+      document.body.appendChild(spark);
+
+      // Self-delete after animation finishes
+      setTimeout(() => {
+        spark.remove();
+      }, 800);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
   // Kontrol Pin & Unpin Percakapan
   const togglePinSession = (id, e) => {
     e.stopPropagation();
-    setPinnedSessions((prev) => 
+    setPinnedSessions((prev) =>
       prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
     );
     setActiveMenuId(null);
@@ -118,10 +274,10 @@ export default function ChatPage() {
       if (res.ok || res.status === 204) {
         setSessions((prev) => prev.filter((s) => s.id !== id));
         setPinnedSessions((prev) => prev.filter((sid) => sid !== id));
-        
+
         if (sessionId === id) {
           setSessionId(null);
-          setMessages([{ role: 'ai', content: 'Sesi telah dihapus. Sesi baru dimulai. Ada kendala teknis lain yang bisa dibantu?', image: null }]);
+          setMessages([]);
         }
       } else {
         alert("Gagal menghapus sesi dari database pusat.");
@@ -171,16 +327,14 @@ export default function ChatPage() {
           image: msg.attachment_ids && msg.attachment_ids.length > 0 ? 'ada' : null
         }));
 
-        setMessages(formattedMessages.length > 0 ? formattedMessages : [
-          { role: 'ai', content: 'Sesi ini kosong. Silakan ketik pesan untuk memulai.', image: null }
-        ]);
+        setMessages(formattedMessages.length > 0 ? formattedMessages : []);
       }
     } catch (err) {
       setMessages([{ role: 'ai', content: 'Gagal memuat riwayat pesan.', image: null }]);
     } {
       setIsTyping(false);
     }
-    
+
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }
@@ -193,7 +347,7 @@ export default function ChatPage() {
 
     const userText = input;
     const currentPreview = imagePreview;
-    
+
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', content: userText, image: currentPreview }]);
     setIsTyping(true);
@@ -259,7 +413,7 @@ export default function ChatPage() {
   const handleNewChat = () => {
     setSessionId(null);
     handleRemoveImage();
-    setMessages([{ role: 'ai', content: 'Sesi baru dimulai. Ada kendala teknis lain yang bisa dibantu?', image: null }]);
+    setMessages([]);
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }
@@ -277,14 +431,63 @@ export default function ChatPage() {
   const pinnedList = sessions.filter(s => pinnedSessions.includes(s.id));
   const regularList = sessions.filter(s => !pinnedSessions.includes(s.id));
 
+  // ── INPUT COMPONENT UTAMA (DISELEKSI CENTERING) ──
+  const renderInputForm = (isCentered = false) => {
+    return (
+      <div className={`${isCentered ? 'w-full max-w-xl mx-auto my-6 border-[#d1d5db] bg-gray-50/50 hover:border-blue-400 focus-within:border-[#124090] focus-within:ring-2 focus-within:ring-blue-100 shadow-sm' : 'max-w-3xl mx-auto bg-[#f9fafb] border-[#d1d5db] focus-within:border-[#124090] focus-within:ring-1 focus-within:ring-[#124090]'} flex flex-col border rounded-3xl p-1.5 md:p-2 transition-all duration-300`}>
+
+        {imagePreview && (
+          <div className="relative inline-block ml-3 mt-2 mb-1 w-16 h-16 rounded-xl border border-gray-300 overflow-hidden bg-white shadow-sm">
+            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+            <button type="button" onClick={handleRemoveImage} className="absolute top-1 right-1 bg-black/60 hover:bg-black text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold transition">✕</button>
+          </div>
+        )}
+
+        <form onSubmit={handleSend} className="flex items-center w-full relative">
+          <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isTyping}
+            className="p-2.5 text-[#6b7280] hover:text-[#124090] transition-colors rounded-full hover:bg-gray-200/50 min-w-[40px] min-h-[40px] flex items-center justify-center"
+            title="Lampirkan Foto Komponen / Error"
+          >
+            <svg className="h-5 w-5 transform rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+          </button>
+
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={isTyping}
+            placeholder={selectedImage ? "Tambahkan catatan keluhan..." : "Tanyakan panduan teknis pada DeskMate..."}
+            className="flex-1 bg-transparent px-2 text-sm text-[#111827] outline-none min-w-0"
+          />
+
+          <button
+            type="submit"
+            disabled={isTyping || (!input.trim() && !selectedImage)}
+            className="ml-1 aspect-square p-2 rounded-full bg-[#124090] text-white flex items-center justify-center transition hover:bg-[#0e306e] disabled:opacity-30 min-w-[36px]"
+          >
+            <svg className="h-4 w-4 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9-7-9-7v14z" />
+            </svg>
+          </button>
+        </form>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-screen w-full bg-white font-sans text-[#111827] overflow-hidden">
 
       {/* ─── TOP HEADER ─── */}
       <header className="fixed top-0 left-0 right-0 flex h-14 md:h-16 items-center justify-between border-b border-[#d1d5db] bg-white px-3 md:px-6 shadow-sm z-30">
         <div className="flex items-center gap-2 md:gap-4">
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="rounded-lg p-2 text-[#6b7280] hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             <svg className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -301,8 +504,20 @@ export default function ChatPage() {
         <div className="flex items-center gap-1 md:gap-2">
           <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></button>
           <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
+
+          {/* Button Toggle Panel Kanan (Context & Actions) */}
+          <button
+            onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+            className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            title={isRightSidebarOpen ? "Sembunyikan Panel Kanan" : "Tampilkan Panel Kanan"}
+          >
+            <svg className={`h-5 w-5 transition-colors ${isRightSidebarOpen ? 'text-[#124090]' : 'text-[#6b7280]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            </svg>
+          </button>
+
           <div className="h-6 w-px bg-gray-300 mx-1 md:mx-2 hidden sm:block"></div>
-          
+
           <div onClick={() => navigate("/profile")} className="flex items-center gap-1 md:gap-2 pl-1 cursor-pointer hover:opacity-80 transition-opacity select-none">
             <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
               {fullName.charAt(0).toUpperCase()}
@@ -322,45 +537,45 @@ export default function ChatPage() {
         )}
 
         {/* ── SIDEBAR PANEL LEFT ── */}
-        <div className={`fixed md:relative inset-y-0 left-0 z-50 md:z-auto bg-[#f9fafb] border-r border-[#d1d5db] flex flex-col transition-transform duration-300 ease-in-out w-[280px] md:w-64 flex-shrink-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className={`fixed md:relative inset-y-0 left-0 z-40 bg-[#f8fafd] border-r border-gray-200/80 flex flex-col transition-all duration-300 ease-in-out w-[280px] md:w-64 flex-shrink-0 ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:-ml-64 md:translate-x-0 md:opacity-100'}`}>
           <div className="p-4 flex-1 overflow-y-auto relative">
             <button onClick={handleNewChat} className="w-full rounded-full border border-[#d1d5db] bg-white text-[#111827] py-2.5 text-sm font-semibold transition hover:bg-gray-50 mb-6 shadow-sm">+ Percakapan Baru</button>
-            
+
             <p className="text-xs font-bold text-[#9ca3af] mb-3 px-1 tracking-wider uppercase">Menu Navigasi</p>
             <nav className="space-y-1 mb-6">
               <button onClick={() => navigate("/dashboard")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
-                <span className="text-base">🏠</span><span>Dashboard Utama</span>
+                <span>Dashboard Utama</span>
               </button>
               <span className="flex items-center gap-3 bg-[#e5e7eb] text-[#111827] rounded-lg p-3 text-sm font-semibold cursor-default">
-                <span className="text-base">💬</span><span>AI Helpdesk Chat</span>
+                <span>AI Helpdesk Chat</span>
               </span>
               <button onClick={() => navigate("/tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
-                <span className="text-base">📋</span><span>Daftar Tiket Saya</span>
+                <span>Daftar Tiket Saya</span>
               </button>
               <button onClick={() => navigate("/tickets/create")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
-                <span className="text-base">➕</span><span>Buat Tiket Baru</span>
+                <span>Buat Tiket Baru</span>
               </button>
 
               {/* Rute Khusus Supervisor */}
-              {((localStorage.getItem('dm_role') || sessionStorage.getItem('dm_role')) === 'supervisor' || 
+              {((localStorage.getItem('dm_role') || sessionStorage.getItem('dm_role')) === 'supervisor' ||
                 (localStorage.getItem('dm_role') || sessionStorage.getItem('dm_role')) === 'admin') && (
-                <>
-                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Supervisor</p>
-                  <button onClick={() => navigate("/all-tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
-                    <span className="text-base">🗂️</span><span>Semua Tiket Unit</span>
-                  </button>
-                </>
-              )}
+                  <>
+                    <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Supervisor</p>
+                    <button onClick={() => navigate("/all-tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                      <span>Semua Tiket Unit</span>
+                    </button>
+                  </>
+                )}
 
               {/* Rute Khusus Admin */}
               {((localStorage.getItem('dm_role') || sessionStorage.getItem('dm_role')) === 'admin') && (
                 <>
                   <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Admin</p>
                   <button onClick={() => navigate("/documents")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
-                    <span className="text-base">📄</span><span>Kelola Dokumen RAG</span>
+                    <span>Kelola Dokumen RAG</span>
                   </button>
                   <button onClick={() => navigate("/users")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
-                    <span className="text-base">⚙️</span><span>Kelola Pengguna</span>
+                    <span>Kelola Pengguna</span>
                   </button>
                 </>
               )}
@@ -369,12 +584,12 @@ export default function ChatPage() {
             {/* KELOMPOK TERSEMAT (PINNED CHAT) */}
             {pinnedList.length > 0 && (
               <div className="mb-5">
-                <p className="text-xs font-bold text-[#9ca3af] mb-2 px-1 tracking-wider uppercase flex items-center gap-1">📌 Tersemat</p>
+                <p className="text-xs font-bold text-[#9ca3af] mb-2 px-1 tracking-wider uppercase flex items-center gap-1">Tersemat</p>
                 <div className="space-y-1.5">
                   {pinnedList.map((s) => (
-                    <div 
-                      key={s.id} 
-                      onClick={() => loadOldSession(s.id)} 
+                    <div
+                      key={s.id}
+                      onClick={() => loadOldSession(s.id)}
                       className={`relative flex items-center justify-between rounded-lg p-2.5 cursor-pointer border transition ${sessionId === s.id ? 'bg-white border-[#124090] shadow-sm' : 'bg-transparent border-transparent hover:bg-gray-200'}`}
                     >
                       <div className="min-w-0 flex-1 pr-1">
@@ -383,8 +598,8 @@ export default function ChatPage() {
                       <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === s.id ? null : s.id); }} className="text-gray-400 hover:text-[#124090] p-1 text-xs font-bold">•••</button>
                       {activeMenuId === s.id && (
                         <div ref={menuRef} className="absolute right-2 top-9 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 w-36 z-50 text-left">
-                          <button onClick={(e) => togglePinSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5">📌 Lepas Pin</button>
-                          <button onClick={(e) => closeSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 border-t border-gray-100">🗑 Hapus</button>
+                          <button onClick={(e) => togglePinSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5">Lepas Pin</button>
+                          <button onClick={(e) => closeSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 border-t border-gray-100">Hapus</button>
                         </div>
                       )}
                     </div>
@@ -400,9 +615,9 @@ export default function ChatPage() {
                 <p className="text-xs text-gray-400 px-1 italic">Belum ada riwayat.</p>
               ) : (
                 regularList.map((s) => (
-                  <div 
-                    key={s.id} 
-                    onClick={() => loadOldSession(s.id)} 
+                  <div
+                    key={s.id}
+                    onClick={() => loadOldSession(s.id)}
                     className={`relative flex items-center justify-between rounded-lg p-2.5 cursor-pointer border transition ${sessionId === s.id ? 'bg-white border-[#124090] shadow-sm' : 'bg-transparent border-transparent hover:bg-gray-200'}`}
                   >
                     <div className="min-w-0 flex-1 pr-1">
@@ -411,8 +626,8 @@ export default function ChatPage() {
                     <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === s.id ? null : s.id); }} className="text-gray-400 hover:text-[#124090] p-1 text-xs font-bold">•••</button>
                     {activeMenuId === s.id && (
                       <div ref={menuRef} className="absolute right-2 top-9 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 w-36 z-50 text-left">
-                        <button onClick={(e) => togglePinSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5">📌 Pin Keatas</button>
-                        <button onClick={(e) => closeSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 border-t border-gray-100">🗑 Hapus</button>
+                        <button onClick={(e) => togglePinSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5">Pin Keatas</button>
+                        <button onClick={(e) => closeSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 border-t border-gray-100">Hapus</button>
                       </div>
                     )}
                   </div>
@@ -425,31 +640,37 @@ export default function ChatPage() {
         {/* ── AREA UTAMA: KONTEN CHAT CENTER ── */}
         <div className="flex-1 flex flex-col bg-white relative min-w-0 h-full">
           <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-36 md:pb-40">
-            
+
             {/* RENDER KONDISIONAL CHAT KOSONG PILIHAN PREMIUM TUAN MUDA */}
             {!sessionId ? (
-              <div className="flex h-full flex-col items-center justify-center text-center px-4 select-none my-auto">
+              <div className="flex h-full flex-col items-center justify-center text-center px-4 select-none my-auto w-full max-w-3xl mx-auto">
                 {/* WATERMARK BRANDING ELEGAN */}
-                <h2 className="text-4xl md:text-5xl font-black tracking-tight text-gray-300 mb-2 font-sans">
-                  DeskMate
-                </h2>
-                
-                <h3 className="text-xl md:text-2xl font-bold text-[#111827] mt-4">
-                  How can I help you today?
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-extrabold text-[#124090] tracking-widest uppercase">Epson AI Helpdesk</span>
+                  <h2 className="text-5xl md:text-6xl font-black tracking-tight bg-gradient-to-r from-[#124090] via-[#003399] to-[#c58af9] bg-clip-text text-transparent mb-1 font-sans">
+                    DeskMate
+                  </h2>
+                </div>
+
+                <h3 className="text-xl md:text-2xl font-bold text-[#111827] mt-6 tracking-tight">
+                  Ada yang bisa saya bantu hari ini?
                 </h3>
                 <p className="mt-2 text-sm text-[#6b7280] max-w-md">
-                  Ask me about IT issues, HR policies, or request a new service ticket.
+                  Tanyakan panduan operasional printer, troubleshoot masalah teknis, atau buat tiket helpdesk baru secara mandiri.
                 </p>
 
-                <div className="mt-8">
-                  <p className="text-xs font-semibold text-[#9ca3af] tracking-wider uppercase mb-4">
-                    Try these prompts:
+                {/* TEXTBOX DI TENGAH ALA GEMINI */}
+                {renderInputForm(true)}
+
+                <div className="mt-6 w-full">
+                  <p className="text-[10px] font-bold text-[#9ca3af] tracking-wider uppercase mb-3">
+                    Coba tanyakan hal berikut:
                   </p>
-                  <div className="flex flex-wrap gap-2.5 justify-center max-w-xl">
-                    <button onClick={() => setInput("I need help resetting my password")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-[#374151] hover:bg-gray-50 hover:border-gray-300 transition shadow-sm cursor-pointer">I need help resetting my password</button>
-                    <button onClick={() => setInput("My VPN keeps disconnecting")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-[#374151] hover:bg-gray-50 hover:border-gray-300 transition shadow-sm cursor-pointer">My VPN keeps disconnecting</button>
-                    <button onClick={() => setInput("How do I request new software?")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-[#374151] hover:bg-gray-50 hover:border-gray-300 transition shadow-sm cursor-pointer">How do I request new software?</button>
-                    <button onClick={() => setInput("Show me HR remote work policy")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-[#374151] hover:bg-gray-50 hover:border-gray-300 transition shadow-sm cursor-pointer">Show me HR remote work policy</button>
+                  <div className="flex flex-wrap gap-2.5 justify-center max-w-xl mx-auto">
+                    <button onClick={() => setInput("Bagaimana cara mengatasi paper jam pada printer A3?")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-semibold text-[#374151] hover:bg-gray-50 hover:border-blue-200 hover:text-[#124090] transition shadow-sm cursor-pointer">Paper Jam Printer A3</button>
+                    <button onClick={() => setInput("Apa arti Error Code E-01 (Carriage Lock) dan bagaimana solusinya?")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-semibold text-[#374151] hover:bg-gray-50 hover:border-blue-200 hover:text-[#124090] transition shadow-sm cursor-pointer">Solusi Error E-01</button>
+                    <button onClick={() => setInput("Lampu indikator tinta (Ink Out) berkedip, apa yang harus dilakukan?")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-semibold text-[#374151] hover:bg-gray-50 hover:border-blue-200 hover:text-[#124090] transition shadow-sm cursor-pointer">Tinta Berkedip (Ink Out)</button>
+                    <button onClick={() => setInput("Bagaimana mendaftarkan printer baru ke Wi-Fi EPSON-SECURE?")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-semibold text-[#374151] hover:bg-gray-50 hover:border-blue-200 hover:text-[#124090] transition shadow-sm cursor-pointer">Registrasi Wi-Fi Printer</button>
                   </div>
                 </div>
               </div>
@@ -496,115 +717,107 @@ export default function ChatPage() {
           </div>
 
           {/* AREA INPUT UTAMA */}
-          <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4 bg-gradient-to-t from-white via-white to-transparent">
-            <div className="max-w-3xl mx-auto flex flex-col bg-[#f9fafb] border border-[#d1d5db] rounded-3xl p-1.5 md:p-2 shadow-sm focus-within:border-[#124090] focus-within:ring-1 focus-within:ring-[#124090] transition-all">
-              
-              {imagePreview && (
-                <div className="relative inline-block ml-3 mt-2 mb-1 w-16 h-16 rounded-xl border border-gray-300 overflow-hidden bg-white shadow-sm">
-                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                  <button onClick={handleRemoveImage} className="absolute top-1 right-1 bg-black/60 hover:bg-black text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold transition">✕</button>
-                </div>
-              )}
-
-              <form onSubmit={handleSend} className="flex items-center w-full relative">
-                <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isTyping}
-                  className="p-2.5 text-[#6b7280] hover:text-[#124090] transition-colors rounded-full hover:bg-gray-200/50 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                  title="Lampirkan Foto Komponen / Error"
-                >
-                  <svg className="h-5 w-5 transform rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                  </svg>
-                </button>
-
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  disabled={isTyping}
-                  placeholder={selectedImage ? "Tambahkan catatan keluhan..." : "Tanyakan panduan teknis pada DeskMate..."}
-                  className="flex-1 bg-transparent px-2 text-sm text-[#111827] outline-none min-w-0"
-                />
-
-                <button
-                  type="submit"
-                  disabled={isTyping || (!input.trim() && !selectedImage)}
-                  className="ml-1 aspect-square p-2 rounded-full bg-[#124090] text-white flex items-center justify-center transition hover:bg-[#0e306e] disabled:opacity-30 min-w-[36px]"
-                >
-                  <svg className="h-4 w-4 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9-7-9-7v14z" />
-                  </svg>
-                </button>
-              </form>
+          {sessionId && (
+            <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4 bg-gradient-to-t from-white via-white to-transparent">
+              {renderInputForm(false)}
             </div>
-          </div>
+          )}
         </div>
 
+
         {/* ── PANEL KANAN: CONTEXT & ACTIONS ── */}
-        <aside className="hidden lg:flex flex-col w-60 bg-[#f9fafb] border-l border-[#d1d5db] p-4 gap-4 overflow-y-auto flex-shrink-0 h-full">
-          <div>
-            <h3 className="text-sm font-bold text-[#111827] mb-1">Context & Actions</h3>
-            <p className="text-[11px] text-[#6b7280] leading-relaxed">Kelola kebutuhan tiket dan rujukan dokumen logis mesin di sini.</p>
-          </div>
-
-          <div className="border-b border-gray-200 pb-3">
-            <button 
-              onClick={createTicketFromChat}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#124090] text-white py-2.5 text-xs font-bold shadow-sm transition hover:bg-[#0e306e]"
-            >
-              <span>🎫</span> Create Ticket from Chat
-            </button>
-            <p className="text-[10px] text-[#6b7280] mt-1.5 text-center leading-normal">Otomatis merangkum riwayat obrolan ini menjadi tiket baru.</p>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <p className="text-[10px] font-bold text-[#9ca3af] tracking-wider uppercase">Suggested Knowledge</p>
-            <div className="space-y-1.5">
-              <div className="flex gap-2 bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm">
-                <span className="text-sm">📄</span>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-[#111827] truncate">Password Reset Guidelines</p>
-                  <p className="text-[9px] text-[#9ca3af]">IT Security • Updated 2w ago</p>
-                </div>
-              </div>
-              <div className="flex gap-2 bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm">
-                <span className="text-sm">🌐</span>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-[#111827] truncate">VPN Troubleshooting Steps</p>
-                  <p className="text-[9px] text-[#9ca3af]">Network Ops • Updated 1m ago</p>
-                </div>
-              </div>
+        {isRightSidebarOpen && (
+          <aside className="hidden lg:flex flex-col w-60 bg-[#f9fafb] border-l border-[#d1d5db] p-4 gap-4 overflow-y-auto flex-shrink-0 h-full">
+            <div>
+              <h3 className="text-sm font-bold text-[#111827] mb-1">Context & Actions</h3>
+              <p className="text-[11px] text-[#6b7280] leading-relaxed">Kelola kebutuhan tiket dan rujukan dokumen logis mesin di sini.</p>
             </div>
-          </div>
 
-          <div className="flex flex-col gap-2 mt-2">
-            <p className="text-[10px] font-bold text-[#9ca3af] tracking-wider uppercase">Your Active Tickets</p>
-            <div className="space-y-2">
-              {tickets.length === 0 ? (
-                <div className="text-center text-xs text-gray-400 py-2 border border-dashed border-gray-200 rounded-xl bg-white italic">Tidak ada tiket aktif</div>
-              ) : (
-                tickets.map((t) => (
-                  <div 
-                    key={t.id} 
-                    onClick={() => navigate(`/tickets/${t.id}`)}
-                    className="bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm"
-                  >
-                    <p className="text-[10px] font-bold text-[#124090]">{t.ticket_number}</p>
-                    <div className="flex justify-between items-center gap-1.5 mt-1">
-                      <p className="text-xs text-[#374151] truncate flex-1">{t.title}</p>
-                      <span className="text-[9px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-md">Open</span>
-                    </div>
+            <div className="border-b border-gray-200 pb-3">
+              <button
+                onClick={createTicketFromChat}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#124090] text-white py-2.5 text-xs font-bold shadow-sm transition hover:bg-[#0e306e]"
+              >
+                Create Ticket from Chat
+              </button>
+              <p className="text-[10px] text-[#6b7280] mt-1.5 text-center leading-normal">Otomatis merangkum riwayat obrolan ini menjadi tiket baru.</p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] font-bold text-[#9ca3af] tracking-wider uppercase">Suggested Knowledge</p>
+              <div className="space-y-1.5">
+                <div className="flex gap-2 bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#111827] truncate">Password Reset Guidelines</p>
+                    <p className="text-[9px] text-[#9ca3af]">IT Security • Updated 2w ago</p>
                   </div>
-                ))
-              )}
+                </div>
+                <div className="flex gap-2 bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#111827] truncate">VPN Troubleshooting Steps</p>
+                    <p className="text-[9px] text-[#9ca3af]">Network Ops • Updated 1m ago</p>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </aside>
+
+            <div className="flex flex-col gap-2 mt-2">
+              <p className="text-[10px] font-bold text-[#9ca3af] tracking-wider uppercase">Your Active Tickets</p>
+              <div className="space-y-2">
+                {tickets.length === 0 ? (
+                  <div className="text-center text-xs text-gray-400 py-2 border border-dashed border-gray-200 rounded-xl bg-white italic">Tidak ada tiket aktif</div>
+                ) : (
+                  tickets.map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => navigate(`/tickets/${t.id}`)}
+                      className="bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm"
+                    >
+                      <p className="text-[10px] font-bold text-[#124090]">{t.ticket_number}</p>
+                      <div className="flex justify-between items-center gap-1.5 mt-1">
+                        <p className="text-xs text-[#374151] truncate flex-1">{t.title}</p>
+                        <span className="text-[9px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-md">Open</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </aside>
+        )}
 
       </div>
+
+      {/* ── STYLE SPARKS DAN ANIMASI GEMINI ── */}
+      <style>{`
+        * {
+          font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+        }
+
+        @keyframes spark-fade {
+          0% {
+            transform: translate(0, 0) scale(0) rotate(0deg);
+            opacity: 0;
+          }
+          15% {
+            transform: translate(0, 0) scale(1) rotate(45deg);
+            opacity: 0.95;
+          }
+          100% {
+            transform: translate(var(--drift-x), var(--drift-y)) scale(0) rotate(180deg);
+            opacity: 0;
+          }
+        }
+        .cursor-spark {
+          position: fixed;
+          pointer-events: none;
+          z-index: 9999;
+          mix-blend-mode: screen;
+          animation: spark-fade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          clip-path: polygon(50% 0%, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0% 50%, 37% 37%);
+        }
+      `}</style>
+
     </div>
   );
 }

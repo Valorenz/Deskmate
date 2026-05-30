@@ -1,21 +1,16 @@
 // src/pages/DocumentManagementPage.jsx
-// -------------------------------------------------------
-// Admin Document Management DeskMate
-// Sesuai desain: split view - daftar dokumen kiri,
-// detail panel kanan, upload button, filter bar
-// -------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Admin Document Management Page DeskMate (Redesigned with Premium Aesthetics)
+//
+// Backend Connection Info:
+// - GET  /api/v1/profiles/me       -> Fetch active user profile
+// - GET  /api/v1/documents/        -> Fetch paginated RAG knowledge base documents
+// - POST /api/v1/documents/upload -> Upload new document (PDF, TXT, MD) and trigger RAG vector indexing
+// -----------------------------------------------------------------------------
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch, getFullName, getRole } from "../utils/auth";
-
-const DOC_ICONS = {
-  "application/pdf": { icon: "📕", color: "#DC2626", label: "PDF Document" },
-  "text/plain":      { icon: "📄", color: "#F59E0B", label: "Text File" },
-  "text/markdown":   { icon: "📝", color: "#6B7280", label: "Markdown" },
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { icon: "📘", color: "#2563EB", label: "Word Document" },
-  default:           { icon: "📄", color: "#6B7280", label: "Document" },
-};
+import { apiFetch, getFullName, getRole, logout } from "../utils/auth";
 
 const INDEXING_STYLE = {
   indexed:    { label: "Active",      bg: "#DCFCE7", color: "#15803D" },
@@ -48,9 +43,18 @@ export default function DocumentManagementPage() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadForm, setUploadForm] = useState({ title: "", category: "SOP", description: "", file: null });
   const [uploadError, setUploadError] = useState("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
   const PAGE_SIZE = 10;
 
-  useEffect(() => { loadProfile(); loadDocuments(); }, [page]);
+  useEffect(() => {
+    loadProfile();
+    loadDocuments();
+  }, [page]);
 
   async function loadProfile() {
     const r = await apiFetch("/api/v1/profiles/me");
@@ -92,6 +96,11 @@ export default function DocumentManagementPage() {
     } finally { setUploading(false); }
   }
 
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
   const filtered = documents.filter(d =>
     !search || d.title?.toLowerCase().includes(search.toLowerCase())
   );
@@ -108,274 +117,622 @@ export default function DocumentManagementPage() {
     return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
-  const docIcon = (type) => DOC_ICONS[type] || DOC_ICONS.default;
   const indexStyle = (status) => INDEXING_STYLE[status] || INDEXING_STYLE.pending;
   const visStyle = (cat) => VISIBILITY_STYLE[cat] || VISIBILITY_STYLE.default;
 
+  // ── CURSOR SPARKS EFFECT ──
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (Math.random() > 0.25) return;
+
+      const spark = document.createElement("div");
+      spark.className = "cursor-spark";
+
+      const size = Math.random() * 8 + 4;
+      spark.style.width = `${size}px`;
+      spark.style.height = `${size}px`;
+
+      spark.style.left = `${e.clientX}px`;
+      spark.style.top = `${e.clientY}px`;
+
+      const colors = [
+        "radial-gradient(circle, #8ab4f8 10%, rgba(138,180,248,0) 80%)",
+        "radial-gradient(circle, #c58af9 10%, rgba(197,138,249,0) 80%)",
+        "radial-gradient(circle, #f382ac 10%, rgba(243,130,172,0) 80%)",
+        "radial-gradient(circle, #a8dab5 10%, rgba(168,218,181,0) 80%)",
+      ];
+      spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+      const driftX = (Math.random() - 0.5) * 60;
+      const driftY = (Math.random() - 0.5) * 60;
+      spark.style.setProperty("--drift-x", `${driftX}px`);
+      spark.style.setProperty("--drift-y", `${driftY}px`);
+
+      document.body.appendChild(spark);
+
+      setTimeout(() => {
+        spark.remove();
+      }, 800);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, []);
+
+  const fullName = profile?.full_name || getFullName() || "User";
+
+  // Vector SVG helper based on document mime-type
+  const renderDocIcon = (mimeType) => {
+    let color = "text-[#6B7280]";
+    if (mimeType === "application/pdf") color = "text-red-500";
+    else if (mimeType === "text/plain") color = "text-amber-500";
+    else if (mimeType === "text/markdown") color = "text-slate-500";
+    else if (mimeType?.includes("document")) color = "text-blue-500";
+
+    return (
+      <svg className={`h-8 w-8 ${color} shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    );
+  };
+
+  const getDocTypeLabel = (mimeType) => {
+    if (mimeType === "application/pdf") return "PDF Document";
+    if (mimeType === "text/plain") return "Text File";
+    if (mimeType === "text/markdown") return "Markdown";
+    if (mimeType?.includes("document")) return "Word Document";
+    return "Document";
+  };
+
   return (
-    <div style={s.root}>
-      {/* ── SIDEBAR ── */}
-      <aside style={s.sidebar}>
-        <div style={s.sidebarLogo}>
-          <div style={s.logoIcon}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#2563EB"/>
+    <div className="flex h-screen w-full bg-[#f4f6fa] font-sans text-[#111827] overflow-hidden relative">
+      {/* ─── STYLES OVERRIDE ─── */}
+      <style>{`
+        * {
+          font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+        }
+        @keyframes spark-fade {
+          0% {
+            transform: translate(0, 0) scale(0) rotate(0deg);
+            opacity: 0;
+          }
+          15% {
+            transform: translate(0, 0) scale(1) rotate(45deg);
+            opacity: 0.95;
+          }
+          100% {
+            transform: translate(var(--drift-x), var(--drift-y)) scale(0) rotate(180deg);
+            opacity: 0;
+          }
+        }
+        .cursor-spark {
+          position: fixed;
+          pointer-events: none;
+          z-index: 9999;
+          mix-blend-mode: screen;
+          animation: spark-fade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          clip-path: polygon(50% 0%, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0% 50%, 37% 37%);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #d1d5db;
+          border-radius: 3px;
+        }
+      `}</style>
+
+      {/* ─── TOP HEADER ─── */}
+      <header className="fixed top-0 left-0 right-0 flex h-14 md:h-16 items-center justify-between border-b border-[#d1d5db] bg-white px-3 md:px-6 shadow-sm z-30">
+        <div className="flex items-center gap-2 md:gap-4">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="rounded-lg p-2 text-[#6b7280] hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+          >
+            <svg className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
-          </div>
-          <span style={s.logoText}>DeskMate</span>
-        </div>
-        <nav style={s.nav}>
-          <NavItem icon="🏠" label="Employee Dashboard" onClick={() => navigate("/dashboard")} />
-          <NavItem icon="🤖" label="AI Chat Interface" onClick={() => navigate("/chat")} />
-          <NavItem icon="☰" label="Employee Ticket List" onClick={() => navigate("/tickets")} />
-          <NavItem icon="+" label="Create Ticket Form" onClick={() => navigate("/tickets/create")} />
-          <div style={s.navSection}>ADMIN</div>
-          <NavItem icon="📁" label="Admin Document Management" active />
-          <NavItem icon="⚙" label="Admin User Management" onClick={() => navigate("/users")} />
-          <NavItem icon="👤" label="Profile" onClick={() => navigate("/profile")} />
-        </nav>
-        <div style={s.sidebarFooter} onClick={() => navigate("/profile")}>
-          <div style={s.avatarSmall}>{profile?.full_name?.charAt(0)?.toUpperCase() || "U"}</div>
-          <div>
-            <div style={s.footerName}>{profile?.full_name || getFullName() || "User"}</div>
-            <div style={s.footerSub}>Admin</div>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── MAIN ── */}
-      <main style={s.main}>
-        {/* Topbar */}
-        <div style={s.topbar}>
-          <h1 style={s.pageTitle}>Document Management</h1>
-          <div style={s.topbarRight}>
-            <button style={s.bellBtn}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-            </button>
-            <button style={s.uploadBtn} onClick={() => setShowUploadModal(true)}>
-              ↑ Upload Document
-            </button>
+          </button>
+          <div className="flex flex-col">
+            <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-[#003399] leading-none">EPSON</h1>
+            <span className="text-[9px] md:text-[10px] font-bold text-[#6b7280] tracking-wider mt-0.5">DESKMATE AI</span>
           </div>
         </div>
 
-        <div style={s.body}>
-          {/* ── LEFT: Document List ── */}
-          <div style={s.listPanel}>
-            {/* Filter bar */}
-            <div style={s.filterBar}>
-              <div style={s.searchWrap}>
-                <span style={s.searchIcon}>🔍</span>
-                <input
-                  type="text"
-                  placeholder="Search knowledge base..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  style={s.searchInput}
-                />
-              </div>
-              <button style={s.filterChip}>📁 All Folders ▾</button>
-              <button style={s.filterChip}>🏷 Tags ▾</button>
-              <button style={s.filterChip}>▼ Status</button>
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Search */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+
+          {/* Settings */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+
+          {/* Bell */}
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </button>
+
+          <div className="h-6 w-px bg-gray-300 mx-1 md:mx-2 hidden sm:block"></div>
+
+          <div onClick={() => navigate("/profile")} className="flex items-center gap-1 md:gap-2 pl-1 cursor-pointer hover:opacity-80 transition-opacity select-none">
+            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
+              {fullName.charAt(0).toUpperCase()}
             </div>
+            <div className="hidden md:flex flex-col text-left">
+              <span className="text-xs font-bold text-[#111827]">{fullName}</span>
+              <span className="text-[10px] text-[#6b7280]">
+                {role === "admin" ? "Admin" : role === "supervisor" ? "Supervisor" : "Karyawan"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
 
-            {/* Table */}
-            <div style={s.tableWrap}>
-              <table style={s.table}>
-                <thead>
-                  <tr style={s.thead}>
-                    <th style={{...s.th, width: 32}}>
-                      <input type="checkbox" style={s.checkbox}/>
-                    </th>
-                    <th style={s.th}>DOCUMENT TITLE</th>
-                    <th style={s.th}>TYPE</th>
-                    <th style={s.th}>VISIBILITY</th>
-                    <th style={s.th}>LAST UPDATED</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={5} style={s.emptyCell}><span style={s.spinner}/> Loading...</td></tr>
-                  ) : filtered.length === 0 ? (
-                    <tr><td colSpan={5} style={s.emptyCell}>No documents found. Upload your first document!</td></tr>
-                  ) : filtered.map(doc => {
-                    const ic = docIcon(doc.file_type);
-                    const is = indexStyle(doc.indexing_status);
-                    const vs = visStyle(doc.category);
-                    const isActive = selected?.id === doc.id;
-                    return (
-                      <tr key={doc.id}
-                        style={{...s.tr, background: isActive ? "#EFF6FF" : "#FFFFFF", borderLeft: isActive ? "3px solid #2563EB" : "3px solid transparent"}}
-                        onClick={() => setSelected(doc)}
-                      >
-                        <td style={s.td} onClick={e => e.stopPropagation()}>
-                          <input type="checkbox" style={s.checkbox}/>
-                        </td>
-                        <td style={s.td}>
-                          <div style={s.docTitleCell}>
-                            <span style={{...s.docIcon, color: ic.color}}>{ic.icon}</span>
-                            <div>
-                              <div style={s.docTitle}>{doc.title}</div>
-                              <div style={s.docMeta}>{doc.category}{doc.description ? ` • ${doc.description.slice(0, 20)}` : ""}</div>
-                            </div>
+      {/* ─── MAIN LAYOUT CONTAINER ─── */}
+      <div className="flex flex-1 pt-14 md:pt-16 overflow-hidden relative w-full h-full">
+        {isSidebarOpen && (
+          <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+        )}
+
+        {/* ── SIDEBAR PANEL LEFT ── */}
+        <div className={`fixed md:relative inset-y-0 left-0 z-40 bg-[#f8fafd] border-r border-gray-200/80 flex flex-col transition-all duration-300 ease-in-out w-[280px] md:w-64 flex-shrink-0 ${isSidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full md:-ml-64 md:translate-x-0 md:opacity-100"}`}>
+          <div className="p-4 flex-1 overflow-y-auto relative custom-scrollbar">
+            <button onClick={() => navigate("/chat")} className="w-full rounded-full border border-[#d1d5db] bg-white text-[#111827] py-2.5 text-sm font-semibold transition hover:bg-gray-50 mb-6 shadow-sm">+ Chat Baru</button>
+
+            <p className="text-xs font-bold text-[#9ca3af] mb-3 px-1 tracking-wider uppercase">Menu Navigasi</p>
+            <nav className="space-y-1 mb-6">
+              <button onClick={() => navigate("/dashboard")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Dashboard Utama</span>
+              </button>
+              <button onClick={() => navigate("/chat")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>AI Helpdesk Chat</span>
+              </button>
+              <button onClick={() => navigate("/tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Daftar Tiket Saya</span>
+              </button>
+              <button onClick={() => navigate("/tickets/create")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span>Buat Tiket Baru</span>
+              </button>
+
+              {/* Rute Khusus Supervisor */}
+              {(role === "supervisor" || role === "admin") && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Supervisor</p>
+                  <button onClick={() => navigate("/all-tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Semua Tiket Unit</span>
+                  </button>
+                </>
+              )}
+
+              {/* Rute Khusus Admin */}
+              {role === "admin" && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Admin</p>
+                  <button onClick={() => navigate("/documents")} className="w-full flex items-center gap-3 text-[#111827] bg-[#e5e7eb] rounded-lg p-3 text-sm font-semibold text-left">
+                    <span>Kelola Dokumen RAG</span>
+                  </button>
+                  <button onClick={() => navigate("/users")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span>Kelola Pengguna</span>
+                  </button>
+                </>
+              )}
+            </nav>
+          </div>
+
+          <div className="p-4 border-t border-gray-200/80 flex items-center gap-3 cursor-pointer hover:bg-gray-100/50 transition-colors" onClick={() => navigate("/profile")}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs">
+              {fullName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-[#111827] truncate">{fullName}</div>
+              <div className="text-[10px] text-[#6b7280]">Profile & Settings</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── AREA UTAMA KONTEN ── */}
+        <main className="flex-1 flex flex-col overflow-hidden bg-[#f0f4f9]">
+          {/* Top page title bar */}
+          <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 shrink-0">
+            <div>
+              <span className="text-[10px] font-extrabold text-[#124090] tracking-widest uppercase">Admin Panel</span>
+              <h2 className="text-lg md:text-xl font-black text-slate-900 tracking-tight mt-0.5">Document Management</h2>
+            </div>
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="bg-[#003399] hover:bg-[#124090] text-white px-4 py-2 rounded-xl text-xs md:text-sm font-bold shadow-sm transition flex items-center gap-2 select-none"
+            >
+              <svg className="h-4 w-4 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Upload Document
+            </button>
+          </div>
+
+          {/* Sub Body split view */}
+          <div className="flex flex-1 overflow-hidden w-full">
+            
+            {/* LEFT PANEL: Document Table List */}
+            <div className="flex-1 flex flex-col p-4 md:p-6 overflow-y-auto custom-scrollbar gap-4 min-w-0">
+              
+              {/* Filter bar */}
+              <div className="flex items-center justify-between gap-4 flex-wrap select-none shrink-0">
+                <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-white border border-gray-300 rounded-xl px-3.5 py-2 shadow-sm">
+                  <svg className="h-4 w-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search knowledge base..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="border-none bg-transparent outline-none text-xs md:text-sm text-slate-800 placeholder-gray-400 w-full"
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button className="bg-white border border-gray-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1">
+                    All Folders
+                    <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  <button className="bg-white border border-gray-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1">
+                    Tags
+                    <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  <button className="bg-white border border-gray-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-full text-xs font-bold transition">
+                    Status
+                  </button>
+                </div>
+              </div>
+
+              {/* Table Container */}
+              <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-sm shrink-0">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-gray-200 select-none">
+                      <th className="p-3 w-10 text-center">
+                        <input type="checkbox" className="accent-[#003399] rounded h-3.5 w-3.5 cursor-pointer" />
+                      </th>
+                      <th className="p-3 text-[10px] md:text-xs font-bold text-slate-400 tracking-wider uppercase">DOCUMENT TITLE</th>
+                      <th className="p-3 text-[10px] md:text-xs font-bold text-slate-400 tracking-wider uppercase">TYPE</th>
+                      <th className="p-3 text-[10px] md:text-xs font-bold text-slate-400 tracking-wider uppercase">VISIBILITY</th>
+                      <th className="p-3 text-[10px] md:text-xs font-bold text-slate-400 tracking-wider uppercase">LAST UPDATED</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={5} className="p-10 text-center text-slate-400 font-semibold text-xs md:text-sm">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="h-4 w-4 border-2 border-gray-300 border-t-[#003399] rounded-full animate-spin"></div>
+                            Loading documents...
                           </div>
                         </td>
-                        <td style={s.td}><span style={s.typeText}>{ic.label}</span></td>
-                        <td style={s.td}>
-                          <span style={{...s.visBadge, background: vs.bg, color: vs.color}}>{vs.label}</span>
-                        </td>
-                        <td style={s.td}>
-                          <div style={s.dateText}>{formatDate(doc.indexed_at || doc.created_at)}</div>
-                          <div style={s.uploadedBy}>by {doc.uploader?.full_name?.split(" ")[0] || "Admin"}</div>
+                      </tr>
+                    ) : filtered.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-12 text-center text-slate-400 font-semibold text-xs md:text-sm">
+                          No documents found. Upload your first document!
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ) : filtered.map(doc => {
+                      const isActive = selected?.id === doc.id;
+                      const vs = visStyle(doc.category);
+                      return (
+                        <tr
+                          key={doc.id}
+                          onClick={() => setSelected(doc)}
+                          className={`border-b border-slate-100 hover:bg-slate-50/55 transition-colors cursor-pointer ${isActive ? "bg-blue-50/50 border-l-4 border-l-[#003399]" : "border-l-4 border-l-transparent"}`}
+                        >
+                          <td className="p-3 w-10 text-center" onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" className="accent-[#003399] rounded h-3.5 w-3.5 cursor-pointer" />
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-start gap-2.5">
+                              {renderDocIcon(doc.file_type)}
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs md:text-sm font-bold text-slate-800 truncate leading-snug">{doc.title}</p>
+                                <p className="text-[10px] text-[#6b7280] mt-0.5 font-medium">
+                                  {doc.category}{doc.description ? ` • ${doc.description.slice(0, 30)}...` : ""}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <span className="text-xs font-bold text-slate-500">{getDocTypeLabel(doc.file_type)}</span>
+                          </td>
+                          <td className="p-3 select-none">
+                            <span className="text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: vs.bg, color: vs.color }}>
+                              {vs.label}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-xs font-bold text-slate-800">{formatDate(doc.indexed_at || doc.created_at)}</div>
+                            <div className="text-[10px] text-[#6b7280] font-medium mt-0.5">by {doc.uploader?.full_name?.split(" ")[0] || "Admin"}</div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {!loading && total > 0 && (
+                <div className="flex items-center justify-between py-2 flex-wrap gap-4 select-none shrink-0">
+                  <span className="text-xs font-semibold text-slate-500">
+                    Showing {Math.min((page - 1) * PAGE_SIZE + 1, total)} to {Math.min(page * PAGE_SIZE, total)} of {total} documents
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 py-1 bg-white border border-gray-300 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg text-xs font-bold transition text-slate-700"
+                    >
+                      Previous
+                    </button>
+                    {[1, 2, 3].map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={`h-7 w-7 rounded-lg text-xs font-extrabold transition ${p === page ? "bg-[#003399] text-white" : "bg-white border border-gray-300 hover:bg-slate-50 text-slate-700"}`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setPage(p => p + 1)}
+                      className="px-3 py-1 bg-white border border-gray-300 hover:bg-slate-50 rounded-lg text-xs font-bold transition text-slate-700"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Pagination */}
-            {!loading && total > 0 && (
-              <div style={s.pagination}>
-                <span style={s.pageInfo}>Showing {Math.min((page-1)*PAGE_SIZE+1, total)} to {Math.min(page*PAGE_SIZE, total)} of {total} documents</span>
-                <div style={s.pageButtons}>
-                  <button style={s.pageNavBtn} onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}>← Previous</button>
-                  {[1,2,3].map(p => (
-                    <button key={p} style={{...s.pageBtn, ...(p===page?s.pageBtnActive:{})}} onClick={() => setPage(p)}>{p}</button>
-                  ))}
-                  <button style={s.pageNavBtn} onClick={() => setPage(p => p+1)}>Next →</button>
+            {/* RIGHT PANEL: Document Details View */}
+            {selected && (
+              <div className="w-[300px] md:w-80 border-l border-gray-200 bg-white p-5 md:p-6 overflow-y-auto custom-scrollbar shrink-0 flex flex-col gap-6">
+                
+                {/* Details Header */}
+                <div className="flex items-start gap-3 border-b border-slate-100 pb-5">
+                  {renderDocIcon(selected.file_type)}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-sm font-black text-slate-900 leading-snug tracking-tight">{selected.title}</h3>
+                    <span className="text-[10px] md:text-xs font-bold text-slate-400 block">
+                      {getDocTypeLabel(selected.file_type)} • {formatSize(selected.file_size_bytes)}
+                    </span>
+                  </div>
                 </div>
+
+                {/* Indexing details */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-extrabold text-[#9ca3af] tracking-wider uppercase">Document Details</h4>
+                  
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-semibold">Status</span>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase" style={{ background: indexStyle(selected.indexing_status).bg, color: indexStyle(selected.indexing_status).color }}>
+                        ● {indexStyle(selected.indexing_status).label}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-semibold">Version</span>
+                      <span className="text-slate-800 font-bold">v2.4</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-semibold">Last Updated</span>
+                      <span className="text-slate-800 font-bold text-right truncate pl-2">
+                        {selected.indexed_at ? new Date(selected.indexed_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-semibold">Uploaded By</span>
+                      <div className="flex items-center gap-1.5 pl-2 select-none">
+                        <div className="h-5 w-5 bg-purple-600 rounded-full text-white font-extrabold text-[10px] flex items-center justify-center">S</div>
+                        <span className="text-slate-800 font-bold">{selected.uploader?.full_name || "Admin"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-extrabold text-[#9ca3af] tracking-wider uppercase">Description</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    {selected.description || "No description provided."}
+                  </p>
+                </div>
+
+                {/* Permissions & Tags */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-extrabold text-[#9ca3af] tracking-wider uppercase">Visibility & Tags</h4>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-[10px] font-extrabold text-slate-400 block mb-1.5 uppercase">Permissions</span>
+                      <div className="flex flex-wrap gap-1.5 select-none">
+                        <span className="text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">● All Employees</span>
+                        <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">🤖 AI Chat Enabled</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-extrabold text-slate-400 block mb-1.5 uppercase">Tags</span>
+                      <div className="flex flex-wrap gap-1.5 items-center select-none">
+                        {(selected.category ? [selected.category, "IT", "Hardware"] : ["General"]).map((t, i) => (
+                          <span key={i} className="text-[9px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">{t}</span>
+                        ))}
+                        <button className="text-[10px] font-bold text-[#003399] hover:underline">+ Add</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions Button */}
+                <div className="space-y-3 pt-4 border-t border-slate-100 select-none">
+                  <button className="w-full bg-[#003399] hover:bg-[#124090] text-white py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                    <svg className="h-3.5 w-3.5 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    Edit Metadata
+                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button className="flex items-center justify-center gap-1 border border-gray-300 hover:bg-slate-50 py-1.5 rounded-xl text-[10px] md:text-xs font-bold text-slate-700 transition">
+                      <svg className="h-3.5 w-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      Replace File
+                    </button>
+                    <button className="flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 py-1.5 rounded-xl text-[10px] md:text-xs font-bold text-red-600 transition">
+                      <svg className="h-3.5 w-3.5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>
+                      Archive
+                    </button>
+                  </div>
+                </div>
+
               </div>
             )}
           </div>
-
-          {/* ── RIGHT: Detail Panel ── */}
-          {selected && (
-            <div style={s.detailPanel}>
-              {/* Doc header */}
-              <div style={s.detailHeader}>
-                <span style={{fontSize: 28, color: docIcon(selected.file_type).color}}>
-                  {docIcon(selected.file_type).icon}
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={s.detailTitle}>{selected.title}</div>
-                  <div style={s.detailSubtitle}>
-                    {docIcon(selected.file_type).label} • {formatSize(selected.file_size_bytes)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Document Details */}
-              <div style={s.section}>
-                <div style={s.sectionTitle}>DOCUMENT DETAILS</div>
-                <DetailRow label="Status">
-                  <span style={{...s.indexBadge, background: indexStyle(selected.indexing_status).bg, color: indexStyle(selected.indexing_status).color}}>
-                    ● {indexStyle(selected.indexing_status).label}
-                  </span>
-                </DetailRow>
-                <DetailRow label="Version"><span style={s.detailVal}>v2.4</span></DetailRow>
-                <DetailRow label="Last Updated">
-                  <span style={s.detailVal}>{selected.indexed_at ? new Date(selected.indexed_at).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}</span>
-                </DetailRow>
-                <DetailRow label="Uploaded By">
-                  <div style={s.uploaderCell}>
-                    <div style={{...s.uploaderAvatar, background: "#7C3AED"}}>S</div>
-                    <span style={s.detailVal}>{selected.uploader?.full_name || "Admin"}</span>
-                  </div>
-                </DetailRow>
-              </div>
-
-              {/* Description */}
-              <div style={s.section}>
-                <div style={s.sectionTitle}>DESCRIPTION</div>
-                <p style={s.descText}>{selected.description || "No description provided."}</p>
-              </div>
-
-              {/* Visibility & Tags */}
-              <div style={s.section}>
-                <div style={s.sectionTitle}>VISIBILITY & TAGS</div>
-                <div style={s.subLabel}>Permissions</div>
-                <div style={s.tagRow}>
-                  <span style={{...s.tag, background: "#DBEAFE", color: "#1D4ED8"}}>● All Employees</span>
-                  <span style={{...s.tag, background: "#DCFCE7", color: "#15803D"}}>🤖 AI Chat Enabled</span>
-                </div>
-                <div style={{...s.subLabel, marginTop: 10}}>Tags</div>
-                <div style={s.tagRow}>
-                  {(selected.category ? [selected.category, "IT", "Hardware"] : ["General"]).map((t, i) => (
-                    <span key={i} style={s.tagGray}>{t}</span>
-                  ))}
-                  <button style={s.addTagBtn}>+ Add</button>
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div style={s.actionBtns}>
-                <button style={s.editBtn}>✏ Edit Metadata</button>
-                <div style={s.actionRow2}>
-                  <button style={s.replaceBtn}>📎 Replace File</button>
-                  <button style={s.archiveBtn}>🗄 Archive</button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
+        </main>
+      </div>
 
       {/* ── UPLOAD MODAL ── */}
       {showUploadModal && (
-        <div style={s.modalOverlay} onClick={() => setShowUploadModal(false)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
-            <div style={s.modalHeader}>
-              <h2 style={s.modalTitle}>Upload Document</h2>
-              <button style={s.modalClose} onClick={() => setShowUploadModal(false)}>×</button>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setShowUploadModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-base md:text-lg font-black text-[#111827]">Upload Document</h2>
+              <button onClick={() => setShowUploadModal(false)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#111827] transition-colors">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            {uploadError && <div style={s.errorBox}>⚠ {uploadError}</div>}
-            <div style={s.modalBody}>
-              <div style={s.fieldGroup}>
-                <label style={s.label}>Document Title *</label>
-                <input type="text" value={uploadForm.title} onChange={e => setUploadForm(p=>({...p,title:e.target.value}))}
-                  placeholder="Contoh: SOP Pengoperasian Mesin A3" style={s.input}
-                  onFocus={e=>e.target.style.borderColor="#2563EB"} onBlur={e=>e.target.style.borderColor="#D1D5DB"}/>
+
+            {/* Error box */}
+            {uploadError && (
+              <div className="mx-6 mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-xs font-bold text-red-600 flex items-center gap-1.5">
+                <svg className="h-4 w-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                {uploadError}
               </div>
-              <div style={s.fieldGroup}>
-                <label style={s.label}>Category</label>
-                <select value={uploadForm.category} onChange={e=>setUploadForm(p=>({...p,category:e.target.value}))} style={s.select}>
+            )}
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Document Title *</label>
+                <input
+                  type="text"
+                  value={uploadForm.title}
+                  onChange={e => setUploadForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="e.g. SOP Troubleshooting Printer L-Series"
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs md:text-sm text-slate-800 placeholder-gray-400 outline-none focus:border-[#003399] transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Category</label>
+                <select
+                  value={uploadForm.category}
+                  onChange={e => setUploadForm(p => ({ ...p, category: e.target.value }))}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs md:text-sm text-slate-800 bg-white outline-none cursor-pointer"
+                >
                   <option value="SOP">SOP</option>
                   <option value="FAQ">FAQ</option>
                   <option value="Manual">Manual</option>
                   <option value="Safety">Safety</option>
                 </select>
               </div>
-              <div style={s.fieldGroup}>
-                <label style={s.label}>Description</label>
-                <textarea value={uploadForm.description} onChange={e=>setUploadForm(p=>({...p,description:e.target.value}))}
-                  placeholder="Deskripsi singkat isi dokumen..." style={s.textarea} rows={3}/>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Description</label>
+                <textarea
+                  value={uploadForm.description}
+                  onChange={e => setUploadForm(p => ({ ...p, description: e.target.value }))}
+                  placeholder="Tulis deskripsi singkat mengenai isi dokumen..."
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs md:text-sm text-slate-800 placeholder-gray-400 outline-none resize-none focus:border-[#003399] transition-all"
+                  rows={3}
+                />
               </div>
-              <div style={s.fieldGroup}>
-                <label style={s.label}>File (PDF / TXT / MD) *</label>
-                <div style={s.dropzone} onClick={() => fileRef.current?.click()}>
-                  <input ref={fileRef} type="file" accept=".pdf,.txt,.md" style={{display:"none"}}
-                    onChange={e => setUploadForm(p=>({...p, file: e.target.files[0]}))}/>
+
+              {/* Custom Upload Area Dropzone */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">File (PDF / TXT / MD) *</label>
+                <div
+                  onClick={() => fileRef.current?.click()}
+                  className="border-2 border-dashed border-gray-300 hover:border-[#003399] rounded-xl p-6 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-col items-center justify-center cursor-pointer select-none text-center"
+                >
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".pdf,.txt,.md"
+                    className="hidden"
+                    onChange={e => setUploadForm(p => ({ ...p, file: e.target.files[0] }))}
+                  />
                   {uploadForm.file ? (
-                    <div>📎 {uploadForm.file.name} ({formatSize(uploadForm.file.size)})</div>
+                    <div className="flex items-center gap-2 text-xs font-bold text-[#003399]">
+                      <svg className="h-5 w-5 text-[#003399]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      {uploadForm.file.name} ({formatSize(uploadForm.file.size)})
+                    </div>
                   ) : (
-                    <div>
-                      <div style={{fontSize:24,marginBottom:6}}>☁</div>
-                      <div style={{fontSize:13}}><span style={{color:"#2563EB",fontWeight:600}}>Click to upload</span> or drag and drop</div>
-                      <div style={{fontSize:11,color:"#9CA3AF",marginTop:4}}>PDF, TXT, MD — max 20MB</div>
+                    <div className="space-y-1">
+                      <div className="flex justify-center">
+                        <svg className="h-8 w-8 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                      </div>
+                      <p className="text-xs font-semibold text-slate-700">
+                        <span className="text-[#003399] hover:underline">Click to upload</span> or drag and drop
+                      </p>
+                      <p className="text-[10px] text-[#6b7280]">PDF, TXT, MD — max 20MB</p>
                     </div>
                   )}
                 </div>
               </div>
             </div>
-            <div style={s.modalFooter}>
-              <button style={s.cancelBtn} onClick={() => setShowUploadModal(false)}>Cancel</button>
+
+            {/* Modal Footer */}
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3 select-none">
               <button
-                style={{...s.submitBtn, opacity: uploading?0.7:1, cursor: uploading?"not-allowed":"pointer"}}
-                onClick={handleUpload} disabled={uploading}
+                onClick={() => setShowUploadModal(false)}
+                className="border border-gray-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="bg-[#003399] hover:bg-[#124090] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded-xl text-xs font-bold transition shadow-sm"
               >
                 {uploading ? "Uploading..." : "Upload & Index"}
               </button>
@@ -383,128 +740,6 @@ export default function DocumentManagementPage() {
           </div>
         </div>
       )}
-
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} tr:hover td{background:#F9FAFB}`}</style>
     </div>
   );
 }
-
-// ── Sub Components ──────────────────────────────────────
-function NavItem({ icon, label, active, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button style={{...s.navItem, background:active?"#EFF6FF":hovered?"#F9FAFB":"transparent", color:active?"#2563EB":"#374151", fontWeight:active?600:400}}
-      onClick={onClick} onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}>
-      <span style={s.navIcon}>{icon}</span>
-      <span style={s.navLabel}>{label}</span>
-    </button>
-  );
-}
-
-function DetailRow({ label, children }) {
-  return (
-    <div style={s.detailRow}>
-      <span style={s.detailKey}>{label}</span>
-      {children}
-    </div>
-  );
-}
-
-// ── Styles ──────────────────────────────────────────────
-const s = {
-  root: { display: "flex", minHeight: "100vh", background: "#F3F4F6", fontFamily: "'DM Sans','Segoe UI',sans-serif" },
-  sidebar: { width: 200, background: "#FFFFFF", borderRight: "1px solid #E5E7EB", display: "flex", flexDirection: "column", flexShrink: 0 },
-  sidebarLogo: { display: "flex", alignItems: "center", gap: 10, padding: "18px 16px", borderBottom: "1px solid #F3F4F6" },
-  logoIcon: { width: 32, height: 32, background: "#EFF6FF", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" },
-  logoText: { fontSize: 15, fontWeight: 700, color: "#111827" },
-  nav: { flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 },
-  navSection: { fontSize: 10, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.08em", padding: "12px 8px 4px", textTransform: "uppercase" },
-  navItem: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", width: "100%", transition: "background 0.12s" },
-  navIcon: { fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 },
-  navLabel: { fontSize: 13, lineHeight: 1.3 },
-  sidebarFooter: { padding: "12px 14px", borderTop: "1px solid #F3F4F6", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
-  avatarSmall: { width: 32, height: 32, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 },
-  footerName: { fontSize: 13, fontWeight: 600, color: "#111827" },
-  footerSub: { fontSize: 11, color: "#9CA3AF" },
-  main: { flex: 1, display: "flex", flexDirection: "column", overflow: "auto" },
-  topbar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", background: "#FFFFFF", borderBottom: "1px solid #E5E7EB" },
-  pageTitle: { fontSize: 18, fontWeight: 700, color: "#111827", margin: 0 },
-  topbarRight: { display: "flex", alignItems: "center", gap: 10 },
-  bellBtn: { background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 8, display: "flex" },
-  uploadBtn: { background: "#2563EB", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" },
-  body: { display: "flex", flex: 1, overflow: "hidden" },
-
-  // List panel
-  listPanel: { flex: 1, display: "flex", flexDirection: "column", padding: "16px", gap: 12, overflow: "auto" },
-  filterBar: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" },
-  searchWrap: { flex: 1, minWidth: 160, display: "flex", alignItems: "center", gap: 8, background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 8, padding: "7px 12px" },
-  searchIcon: { fontSize: 13 },
-  searchInput: { border: "none", background: "transparent", outline: "none", fontSize: 13, color: "#374151", fontFamily: "inherit", flex: 1 },
-  filterChip: { background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 20, fontSize: 12, color: "#374151", padding: "5px 12px", cursor: "pointer", whiteSpace: "nowrap" },
-  tableWrap: { background: "#FFFFFF", borderRadius: 10, border: "1px solid #E5E7EB", overflow: "hidden" },
-  table: { width: "100%", borderCollapse: "collapse" },
-  thead: { background: "#F9FAFB" },
-  th: { padding: "9px 12px", fontSize: 11, fontWeight: 700, color: "#6B7280", textAlign: "left", letterSpacing: "0.05em", borderBottom: "1px solid #F3F4F6" },
-  tr: { borderBottom: "1px solid #F9FAFB", cursor: "pointer", transition: "background 0.1s" },
-  td: { padding: "10px 12px", verticalAlign: "middle" },
-  checkbox: { width: 14, height: 14, accentColor: "#2563EB", cursor: "pointer" },
-  docTitleCell: { display: "flex", alignItems: "flex-start", gap: 8 },
-  docIcon: { fontSize: 20, flexShrink: 0, marginTop: 1 },
-  docTitle: { fontSize: 13, fontWeight: 600, color: "#111827", marginBottom: 2 },
-  docMeta: { fontSize: 11, color: "#9CA3AF" },
-  typeText: { fontSize: 12, color: "#6B7280" },
-  visBadge: { fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20 },
-  dateText: { fontSize: 12, color: "#374151" },
-  uploadedBy: { fontSize: 11, color: "#9CA3AF" },
-  pagination: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", flexWrap: "wrap", gap: 8 },
-  pageInfo: { fontSize: 12, color: "#6B7280" },
-  pageButtons: { display: "flex", gap: 4, alignItems: "center" },
-  pageNavBtn: { padding: "5px 12px", border: "1px solid #E5E7EB", background: "#FFFFFF", borderRadius: 6, fontSize: 12, color: "#374151", cursor: "pointer", fontFamily: "inherit" },
-  pageBtn: { minWidth: 30, height: 30, border: "1px solid #E5E7EB", background: "#FFFFFF", borderRadius: 6, fontSize: 13, color: "#374151", cursor: "pointer" },
-  pageBtnActive: { background: "#2563EB", color: "#FFFFFF", borderColor: "#2563EB" },
-
-  // Detail panel
-  detailPanel: { width: 240, background: "#FFFFFF", borderLeft: "1px solid #E5E7EB", padding: "16px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 0, flexShrink: 0 },
-  detailHeader: { display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid #F3F4F6" },
-  detailTitle: { fontSize: 14, fontWeight: 700, color: "#111827", lineHeight: 1.4 },
-  detailSubtitle: { fontSize: 11, color: "#6B7280", marginTop: 3 },
-  section: { paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid #F3F4F6" },
-  sectionTitle: { fontSize: 10, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 },
-  detailRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  detailKey: { fontSize: 12, color: "#6B7280" },
-  detailVal: { fontSize: 12, fontWeight: 500, color: "#374151", textAlign: "right" },
-  indexBadge: { fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20 },
-  uploaderCell: { display: "flex", alignItems: "center", gap: 6 },
-  uploaderAvatar: { width: 20, height: 20, borderRadius: "50%", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 },
-  descText: { fontSize: 12, color: "#374151", lineHeight: 1.6, margin: 0 },
-  subLabel: { fontSize: 11, fontWeight: 600, color: "#6B7280", marginBottom: 6 },
-  tagRow: { display: "flex", flexWrap: "wrap", gap: 6 },
-  tag: { fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20 },
-  tagGray: { fontSize: 11, color: "#374151", background: "#F3F4F6", padding: "3px 9px", borderRadius: 20 },
-  addTagBtn: { fontSize: 11, color: "#2563EB", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontFamily: "inherit" },
-  actionBtns: { display: "flex", flexDirection: "column", gap: 8, marginTop: 4 },
-  editBtn: { background: "#2563EB", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%" },
-  actionRow2: { display: "flex", gap: 8 },
-  replaceBtn: { flex: 1, background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 8, padding: "8px", fontSize: 12, color: "#374151", cursor: "pointer" },
-  archiveBtn: { flex: 1, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "8px", fontSize: 12, color: "#DC2626", cursor: "pointer" },
-
-  // Modal
-  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 },
-  modal: { background: "#FFFFFF", borderRadius: 14, width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.15)", overflow: "hidden" },
-  modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", borderBottom: "1px solid #F3F4F6" },
-  modalTitle: { fontSize: 16, fontWeight: 700, color: "#111827", margin: 0 },
-  modalClose: { background: "none", border: "none", fontSize: 20, color: "#9CA3AF", cursor: "pointer", padding: 0, lineHeight: 1 },
-  modalBody: { padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 },
-  modalFooter: { padding: "14px 24px", borderTop: "1px solid #F3F4F6", display: "flex", justifyContent: "flex-end", gap: 10 },
-  fieldGroup: { display: "flex", flexDirection: "column", gap: 6 },
-  label: { fontSize: 13, fontWeight: 600, color: "#374151" },
-  input: { padding: "9px 12px", borderRadius: 8, border: "1px solid #D1D5DB", fontSize: 13, color: "#111827", outline: "none", fontFamily: "inherit" },
-  select: { padding: "9px 12px", borderRadius: 8, border: "1px solid #D1D5DB", fontSize: 13, color: "#111827", outline: "none", fontFamily: "inherit", background: "#FFFFFF" },
-  textarea: { padding: "9px 12px", borderRadius: 8, border: "1px solid #D1D5DB", fontSize: 13, color: "#111827", outline: "none", resize: "vertical", fontFamily: "inherit" },
-  dropzone: { border: "1.5px dashed #D1D5DB", borderRadius: 8, padding: "20px", display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer", background: "#FAFAFA", fontSize: 13, color: "#374151", textAlign: "center" },
-  errorBox: { margin: "0 24px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#DC2626" },
-  cancelBtn: { padding: "9px 20px", borderRadius: 8, border: "1px solid #D1D5DB", background: "#FFFFFF", fontSize: 13, fontWeight: 500, color: "#374151", cursor: "pointer" },
-  submitBtn: { padding: "9px 20px", borderRadius: 8, border: "none", background: "#2563EB", fontSize: 13, fontWeight: 600, color: "#FFFFFF", cursor: "pointer" },
-  emptyCell: { padding: "32px", textAlign: "center", color: "#9CA3AF", fontSize: 13 },
-  spinner: { display: "inline-block", width: 14, height: 14, border: "2px solid #E5E7EB", borderTopColor: "#2563EB", borderRadius: "50%", animation: "spin 0.6s linear infinite", marginRight: 8 },
-};
