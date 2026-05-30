@@ -1,512 +1,610 @@
 // src/pages/ChatPage.jsx
-// -------------------------------------------------------
-// AI Chat Interface DeskMate
-// Sesuai desain screenshot: sidebar kiri, tab sesi, area chat,
-// input bar, context & actions panel kanan
-// -------------------------------------------------------
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { apiFetch, getFullName, getRole, logout } from "../utils/auth";
-
-const PROMPTS = [
-  "I need help resetting my password",
-  "My VPN keeps disconnecting",
-  "How do I request new software?",
-  "Show me HR remote work policy",
-];
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function ChatPage() {
   const navigate = useNavigate();
-  const role = getRole();
+  const [input, setInput] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [tickets, setTickets] = useState([]);
+  
+  // ── FITUR DINAMISASI PROFIL ──
+  const [fullName, setFullName] = useState("User");
+
+  // ── FITUR GEMINI: Pinned Sesi & Dropdown Trigger ──
+  const [pinnedSessions, setPinnedSessions] = useState(() => {
+    const saved = localStorage.getItem('dm_pinned_sessions');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [activeMenuId, setActiveMenuId] = useState(null);
+
+  // ── FITUR GAMBAR: Image Management Logistik ──
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const [messages, setMessages] = useState([
+    { role: 'ai', content: 'Halo, Teknisi. Saya DeskMate AI. Ada kendala teknis atau kode error mesin yang bisa saya bantu identifikasi hari ini?', image: null }
+  ]);
+
   const messagesEndRef = useRef(null);
 
-  const [sessions, setSessions] = useState([]);
-  const [activeSession, setActiveSession] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [tickets, setTickets] = useState([]);
-  const [profile, setProfile] = useState(null);
-  const [loadingMsgs, setLoadingMsgs] = useState(false);
+  // Auto-scroll area chat
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping, imagePreview]);
 
-  useEffect(() => { loadInitial(); }, []);
-  useEffect(() => { scrollToBottom(); }, [messages]);
-
-  const scrollToBottom = () =>
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-
-  async function loadInitial() {
-    // Profil
-    const pr = await apiFetch("/api/v1/profiles/me");
-    if (pr?.ok) setProfile(await pr.json());
-
-    // Sesi chat
-    const sr = await apiFetch("/api/v1/chat/sessions");
-    if (sr?.ok) {
-      const data = await sr.json();
-      setSessions(data);
-    }
-
-    // Tiket aktif
-    const tr = await apiFetch("/api/v1/tickets/?status=open&size=5");
-    if (tr?.ok) {
-      const data = await tr.json();
-      setTickets(data.items || []);
-    }
-  }
-
-  async function createSession(title = null) {
-    const res = await apiFetch("/api/v1/chat/sessions", {
-      method: "POST",
-      body: JSON.stringify({ title }),
-    });
-    if (res?.ok) {
-      const session = await res.json();
-      setSessions((prev) => [session, ...prev]);
-      setActiveSession(session);
-      setMessages([]);
-      return session;
-    }
-    return null;
-  }
-
-  async function switchSession(session) {
-    setActiveSession(session);
-    setLoadingMsgs(true);
-    const res = await apiFetch(`/api/v1/chat/sessions/${session.id}/messages`);
-    if (res?.ok) setMessages(await res.json());
-    setLoadingMsgs(false);
-  }
-
-  async function closeSession(sessionId, e) {
-    e.stopPropagation();
-    const res = await apiFetch(`/api/v1/chat/sessions/${sessionId}`, { method: "DELETE" });
-    if (res?.ok || res?.status === 204) {
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-      if (activeSession?.id === sessionId) {
-        setActiveSession(null);
-        setMessages([]);
+  // Deteksi klik luar untuk menutup dropdown menu titik tiga
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setActiveMenuId(null);
       }
     }
-  }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  async function sendMessage(content) {
-    if (!content.trim() || sending) return;
+  // Sinkronisasi data sematan ke LocalStorage
+  useEffect(() => {
+    localStorage.setItem('dm_pinned_sessions', JSON.stringify(pinnedSessions));
+  }, [pinnedSessions]);
 
-    let session = activeSession;
-    if (!session) {
-      session = await createSession();
-      if (!session) return;
-    }
+  // Load awal riwayat sesi, data tiket aktif, dan profil asli user
+  const loadInitialData = async () => {
+    const token = localStorage.getItem('dm_token') || sessionStorage.getItem('dm_token');
+    if (!token) return;
 
-    setInput("");
-    setSending(true);
-
-    // Tambah pesan user langsung ke UI
-    const tempUserMsg = {
-      id: "temp-user-" + Date.now(),
-      role: "user",
-      content,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, tempUserMsg]);
-
-    // Tambah loading indicator AI
-    const tempAiId = "temp-ai-" + Date.now();
-    setMessages((prev) => [...prev, { id: tempAiId, role: "assistant", content: "...", loading: true, created_at: new Date().toISOString() }]);
+    const savedName = localStorage.getItem('dm_full_name') || sessionStorage.getItem('dm_full_name');
+    if (savedName) setFullName(savedName);
 
     try {
-      const form = new FormData();
-      form.append("content", content);
-      form.append("attachment_ids", "[]");
-
-      const res = await apiFetch(
-        `/api/v1/chat/sessions/${session.id}/messages`,
-        { method: "POST", body: form }
-      );
-
-      if (res?.ok) {
-        const data = await res.json();
-        // Ganti pesan temp dengan data real
-        setMessages((prev) =>
-          prev
-            .filter((m) => m.id !== tempAiId && m.id !== tempUserMsg.id)
-            .concat([data.user_message, data.ai_message])
-        );
-        // Update judul sesi jika baru
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === session.id ? { ...s, title: data.user_message?.content?.slice(0, 30) || s.title } : s
-          )
-        );
-      } else {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === tempAiId
-              ? { ...m, content: "Maaf, terjadi kesalahan. Coba lagi.", loading: false }
-              : m
-          )
-        );
+      // 1. Fetch Sesi Percakapan
+      const sessionRes = await fetch('http://localhost:8000/api/v1/chat/sessions', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json();
+        setSessions(sessionData);
       }
-    } catch {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === tempAiId
-            ? { ...m, content: "Tidak dapat terhubung ke server.", loading: false }
-            : m
-        )
-      );
-    } finally {
-      setSending(false);
-    }
-  }
 
-  async function createTicketFromChat() {
-    if (!activeSession || messages.length === 0) {
-      navigate("/tickets/create");
-      return;
-    }
-    navigate(`/tickets/create?session_id=${activeSession.id}`);
-  }
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(input);
+      // 2. Fetch Tiket Aktif
+      const ticketRes = await fetch('http://localhost:8000/api/v1/tickets/?status=open&size=5', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (ticketRes.ok) {
+        const ticketData = await ticketRes.json();
+        setTickets(ticketData.items || []);
+      }
+    } catch (err) {
+      console.error("Gagal sinkronisasi data internal backend", err);
     }
   };
 
-  return (
-    <div style={s.root}>
-      {/* ── SIDEBAR ── */}
-      <aside style={s.sidebar}>
-        <div style={s.sidebarLogo}>
-          <div style={s.logoIcon}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#2563EB"/>
-            </svg>
-          </div>
-          <span style={s.logoText}>DeskMate</span>
-        </div>
-        <nav style={s.nav}>
-          <NavItem icon="🏠" label="Employee Dashboard" onClick={() => navigate("/dashboard")} />
-          <NavItem icon="🤖" label="AI Chat Interface" active />
-          <NavItem icon="☰" label="Employee Ticket List" onClick={() => navigate("/tickets")} />
-          <NavItem icon="+" label="Create Ticket Form" onClick={() => navigate("/tickets/create")} />
-          {(role === "admin" || role === "supervisor") && (
-            <>
-              <div style={s.navSection}>ADMIN</div>
-              <NavItem icon="📄" label="Admin Document Management" onClick={() => navigate("/documents")} />
-              <NavItem icon="⚙" label="Admin User Management" onClick={() => navigate("/users")} />
-            </>
-          )}
-        </nav>
-        <div style={s.sidebarFooter} onClick={() => navigate("/profile")}>
-          <div style={s.avatarSmall}>{profile?.full_name?.charAt(0)?.toUpperCase() || "U"}</div>
-          <div>
-            <div style={s.footerName}>{profile?.full_name || getFullName() || "User"}</div>
-            <div style={s.footerSub}>Profile & Settings</div>
-          </div>
-        </div>
-      </aside>
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
-      {/* ── CENTER ── */}
-      <div style={s.center}>
-        {/* Header */}
-        <div style={s.header}>
-          <h1 style={s.pageTitle}>AI Helpdesk Assistant</h1>
-          <button style={s.bellBtn}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
-          </button>
-        </div>
-
-        {/* Session tabs */}
-        <div style={s.tabBar}>
-          {sessions.slice(0, 4).map((session) => (
-            <button
-              key={session.id}
-              style={{ ...s.tab, ...(activeSession?.id === session.id ? s.tabActive : {}) }}
-              onClick={() => switchSession(session)}
-            >
-              <span style={{ maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {session.title || "New Chat"}
-              </span>
-              <span style={s.tabClose} onClick={(e) => closeSession(session.id, e)}>×</span>
-            </button>
-          ))}
-          <button style={s.newChatBtn} onClick={() => createSession()}>
-            + New Chat
-          </button>
-        </div>
-
-        {/* Chat area */}
-        <div style={s.chatArea}>
-          {!activeSession ? (
-            /* Empty state */
-            <div style={s.emptyState}>
-              <div style={s.emptyIcon}>🤖</div>
-              <h2 style={s.emptyTitle}>How can I help you today?</h2>
-              <p style={s.emptySubtitle}>
-                Ask me about IT issues, HR policies, or request a new service ticket.
-              </p>
-              <div style={s.promptsLabel}>Try these prompts:</div>
-              <div style={s.prompts}>
-                {PROMPTS.map((p) => (
-                  <button
-                    key={p}
-                    style={s.promptBtn}
-                    onClick={() => { createSession(p.slice(0, 30)).then(() => sendMessage(p)); }}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : loadingMsgs ? (
-            <div style={s.emptyState}>
-              <div style={s.loadingDots}>
-                <span style={s.dot} />
-                <span style={{ ...s.dot, animationDelay: "0.2s" }} />
-                <span style={{ ...s.dot, animationDelay: "0.4s" }} />
-              </div>
-            </div>
-          ) : (
-            /* Messages */
-            <div style={s.messages}>
-              {messages.map((msg) => (
-                <MessageBubble key={msg.id} msg={msg} />
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-
-        {/* Input bar */}
-        <div style={s.inputBar}>
-          <button style={s.attachBtn} title="Lampirkan gambar">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-            </svg>
-          </button>
-          <textarea
-            value={input}
-            onChange={(e) => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
-            onKeyDown={handleKeyDown}
-            placeholder="Describe your issue or ask a question..."
-            style={s.textarea}
-            rows={1}
-            disabled={sending}
-          />
-          <button
-            style={{ ...s.sendBtn, opacity: (!input.trim() || sending) ? 0.5 : 1 }}
-            onClick={() => sendMessage(input)}
-            disabled={!input.trim() || sending}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
-              <line x1="22" y1="2" x2="11" y2="13"/>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-            </svg>
-          </button>
-        </div>
-        <div style={s.inputFooter}>
-          <span style={s.disclaimer}>AI can make mistakes. Verify important information.</span>
-          <button style={s.clearBtn} onClick={() => { setMessages([]); setActiveSession(null); }}>
-            🗑 Clear Chat
-          </button>
-        </div>
-      </div>
-
-      {/* ── RIGHT PANEL ── */}
-      <aside style={s.rightPanel}>
-        <h3 style={s.panelTitle}>Context & Actions</h3>
-
-        {/* Create Ticket */}
-        <button style={s.createTicketBtn} onClick={createTicketFromChat}>
-          <span style={{ marginRight: 8 }}>🎫</span>
-          Create Ticket from Chat
-        </button>
-        <p style={s.createTicketSub}>
-          Automatically summarizes this conversation into a new support ticket.
-        </p>
-
-        {/* Suggested Knowledge */}
-        <div style={s.panelSection}>SUGGESTED KNOWLEDGE</div>
-        <div style={s.knowledgeList}>
-          <KnowledgeItem icon="📄" title="Password Reset Guidelines" meta="IT Security • Updated 2w ago" />
-          <KnowledgeItem icon="🌐" title="VPN Troubleshooting Steps" meta="Network Ops • Updated 1m ago" />
-        </div>
-
-        {/* Active Tickets */}
-        <div style={s.panelSection}>YOUR ACTIVE TICKETS</div>
-        {tickets.length === 0 ? (
-          <div style={s.noTickets}>Tidak ada tiket aktif</div>
-        ) : (
-          tickets.map((t) => (
-            <div
-              key={t.id}
-              style={s.ticketCard}
-              onClick={() => navigate(`/tickets/${t.id}`)}
-            >
-              <div style={s.ticketNum}>{t.ticket_number}</div>
-              <div style={s.ticketMeta}>
-                <span style={s.ticketTitle}>{t.title?.slice(0, 30)}</span>
-                <span style={s.ticketOpen}>Open</span>
-              </div>
-            </div>
-          ))
-        )}
-      </aside>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes bounce {
-          0%, 80%, 100% { transform: translateY(0); }
-          40% { transform: translateY(-6px); }
-        }
-      `}</style>
-    </div>
-  );
-}
-
-// ── Sub Components ──────────────────────────────────────
-
-function MessageBubble({ msg }) {
-  const isUser = msg.role === "user";
-  if (msg.loading) {
-    return (
-      <div style={{ ...s.msgRow, justifyContent: "flex-start" }}>
-        <div style={s.aiBubble}>
-          <span style={s.loadingDot1}>●</span>
-          <span style={s.loadingDot2}>●</span>
-          <span style={s.loadingDot3}>●</span>
-        </div>
-      </div>
+  // Kontrol Pin & Unpin Percakapan
+  const togglePinSession = (id, e) => {
+    e.stopPropagation();
+    setPinnedSessions((prev) => 
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
     );
-  }
+    setActiveMenuId(null);
+  };
+
+  // Penghapusan Sesi via API Backend
+  const closeSession = async (id, e) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    const token = localStorage.getItem('dm_token') || sessionStorage.getItem('dm_token');
+    if (!token) return;
+
+    if (!confirm("Apakah Tuan Muda yakin ingin menghapus riwayat percakapan ini?")) return;
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/chat/sessions/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok || res.status === 204) {
+        setSessions((prev) => prev.filter((s) => s.id !== id));
+        setPinnedSessions((prev) => prev.filter((sid) => sid !== id));
+        
+        if (sessionId === id) {
+          setSessionId(null);
+          setMessages([{ role: 'ai', content: 'Sesi telah dihapus. Sesi baru dimulai. Ada kendala teknis lain yang bisa dibantu?', image: null }]);
+        }
+      } else {
+        alert("Gagal menghapus sesi dari database pusat.");
+      }
+    } catch (err) {
+      console.error("Koneksi sirkuit API bermasalah", err);
+    }
+  };
+
+  // Upload Gambar & Validasi Berkas Maksimal 5MB
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Ukuran berkas melebihi 5MB. Batas sistem internal Epson.");
+        return;
+      }
+      setSelectedImage(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Membuka Sesi Lama
+  const loadOldSession = async (id) => {
+    const token = localStorage.getItem('dm_token') || sessionStorage.getItem('dm_token');
+    if (!token) return;
+
+    setSessionId(id);
+    setIsTyping(true);
+    handleRemoveImage();
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/chat/sessions/${id}/messages`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const formattedMessages = data.map((msg) => ({
+          role: msg.role === 'assistant' ? 'ai' : 'user',
+          content: msg.content,
+          image: msg.attachment_ids && msg.attachment_ids.length > 0 ? 'ada' : null
+        }));
+
+        setMessages(formattedMessages.length > 0 ? formattedMessages : [
+          { role: 'ai', content: 'Sesi ini kosong. Silakan ketik pesan untuk memulai.', image: null }
+        ]);
+      }
+    } catch (err) {
+      setMessages([{ role: 'ai', content: 'Gagal memuat riwayat pesan.', image: null }]);
+    } {
+      setIsTyping(false);
+    }
+    
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  // Pengiriman Pesan ke AI (Multipart Form-Data)
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!input.trim() && !selectedImage || isTyping) return;
+
+    const userText = input;
+    const currentPreview = imagePreview;
+    
+    setInput('');
+    setMessages((prev) => [...prev, { role: 'user', content: userText, image: currentPreview }]);
+    setIsTyping(true);
+    handleRemoveImage();
+
+    const token = localStorage.getItem('dm_token') || sessionStorage.getItem('dm_token');
+    if (!token) {
+      setMessages((prev) => [...prev, { role: 'ai', content: 'Akses ditolak: Token tidak ditemukan. Harap login kembali.', image: null }]);
+      setIsTyping(false);
+      return;
+    }
+
+    try {
+      let currentSessionId = sessionId;
+
+      if (!currentSessionId) {
+        const sessionRes = await fetch('http://localhost:8000/api/v1/chat/sessions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ title: userText ? userText.substring(0, 40) : 'Eskalasi Gambar' })
+        });
+
+        if (!sessionRes.ok) throw new Error('Gagal membuat sesi baru.');
+        const sessionData = await sessionRes.json();
+        currentSessionId = sessionData.id;
+        setSessionId(currentSessionId);
+        loadInitialData();
+      }
+
+      const formData = new FormData();
+      formData.append('content', userText);
+
+      let targetUrl = `http://localhost:8000/api/v1/chat/sessions/${currentSessionId}/messages`;
+
+      if (selectedImage) {
+        formData.append('image', selectedImage);
+        targetUrl += '/with-image';
+      } else {
+        formData.append('attachment_ids', '[]');
+      }
+
+      const messageRes = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      if (!messageRes.ok) throw new Error('Gagal mengirim pesan ke AI.');
+      const messageData = await messageRes.json();
+
+      setMessages((prev) => [...prev, { role: 'ai', content: messageData.ai_message.content, image: null }]);
+
+    } catch (error) {
+      setMessages((prev) => [...prev, { role: 'ai', content: 'Koneksi ke server pusat terputus.', image: null }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleNewChat = () => {
+    setSessionId(null);
+    handleRemoveImage();
+    setMessages([{ role: 'ai', content: 'Sesi baru dimulai. Ada kendala teknis lain yang bisa dibantu?', image: null }]);
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  const createTicketFromChat = () => {
+    if (!sessionId || messages.length === 0) {
+      navigate("/tickets/create");
+      return;
+    }
+    navigate(`/tickets/create?session_id=${sessionId}`);
+  };
+
+  // Filter List Sesi Sidebar ala Gemini Sorting
+  const pinnedList = sessions.filter(s => pinnedSessions.includes(s.id));
+  const regularList = sessions.filter(s => !pinnedSessions.includes(s.id));
+
   return (
-    <div style={{ ...s.msgRow, justifyContent: isUser ? "flex-end" : "flex-start" }}>
-      {!isUser && <div style={s.aiAvatar}>🤖</div>}
-      <div style={isUser ? s.userBubble : s.aiBubble}>
-        <div style={s.msgContent}>{msg.content}</div>
-        {msg.source_documents?.length > 0 && (
-          <div style={s.sources}>
-            📎 Sumber: {msg.source_documents.map((d) => d.title).join(", ")}
+    <div className="flex h-screen w-full bg-white font-sans text-[#111827] overflow-hidden">
+
+      {/* ─── TOP HEADER ─── */}
+      <header className="fixed top-0 left-0 right-0 flex h-14 md:h-16 items-center justify-between border-b border-[#d1d5db] bg-white px-3 md:px-6 shadow-sm z-30">
+        <div className="flex items-center gap-2 md:gap-4">
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+            className="rounded-lg p-2 text-[#6b7280] hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+          >
+            <svg className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <div className="flex flex-col">
+            <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-[#003399] leading-none">EPSON</h1>
+            <span className="text-[9px] md:text-[10px] font-bold text-[#6b7280] tracking-wider mt-0.5">DESKMATE AI</span>
           </div>
+        </div>
+
+        {/* Profil Header Dinamis */}
+        <div className="flex items-center gap-1 md:gap-2">
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></button>
+          <button className="rounded-full p-2.5 text-[#6b7280] hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
+          <div className="h-6 w-px bg-gray-300 mx-1 md:mx-2 hidden sm:block"></div>
+          
+          <div onClick={() => navigate("/profile")} className="flex items-center gap-1 md:gap-2 pl-1 cursor-pointer hover:opacity-80 transition-opacity select-none">
+            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
+              {fullName.charAt(0).toUpperCase()}
+            </div>
+            <div className="hidden md:flex flex-col text-left">
+              <span className="text-xs font-bold text-[#111827]">{fullName}</span>
+              <span className="text-[10px] text-[#6b7280]">PM / Admin</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── MAIN LAYOUT CONTAINER ─── */}
+      <div className="flex flex-1 pt-14 md:pt-16 overflow-hidden relative w-full">
+        {isSidebarOpen && (
+          <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
         )}
+
+        {/* ── SIDEBAR PANEL LEFT ── */}
+        <div className={`fixed md:relative inset-y-0 left-0 z-50 md:z-auto bg-[#f9fafb] border-r border-[#d1d5db] flex flex-col transition-transform duration-300 ease-in-out w-[280px] md:w-64 flex-shrink-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+          <div className="p-4 flex-1 overflow-y-auto relative">
+            <button onClick={handleNewChat} className="w-full rounded-full border border-[#d1d5db] bg-white text-[#111827] py-2.5 text-sm font-semibold transition hover:bg-gray-50 mb-6 shadow-sm">+ Percakapan Baru</button>
+            
+            <p className="text-xs font-bold text-[#9ca3af] mb-3 px-1 tracking-wider uppercase">Menu Navigasi</p>
+            <nav className="space-y-1 mb-6">
+              <button onClick={() => navigate("/dashboard")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span className="text-base">🏠</span><span>Dashboard Utama</span>
+              </button>
+              <span className="flex items-center gap-3 bg-[#e5e7eb] text-[#111827] rounded-lg p-3 text-sm font-semibold cursor-default">
+                <span className="text-base">💬</span><span>AI Helpdesk Chat</span>
+              </span>
+              <button onClick={() => navigate("/tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span className="text-base">📋</span><span>Daftar Tiket Saya</span>
+              </button>
+              <button onClick={() => navigate("/tickets/create")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                <span className="text-base">➕</span><span>Buat Tiket Baru</span>
+              </button>
+
+              {/* Rute Khusus Supervisor */}
+              {((localStorage.getItem('dm_role') || sessionStorage.getItem('dm_role')) === 'supervisor' || 
+                (localStorage.getItem('dm_role') || sessionStorage.getItem('dm_role')) === 'admin') && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Supervisor</p>
+                  <button onClick={() => navigate("/all-tickets")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span className="text-base">🗂️</span><span>Semua Tiket Unit</span>
+                  </button>
+                </>
+              )}
+
+              {/* Rute Khusus Admin */}
+              {((localStorage.getItem('dm_role') || sessionStorage.getItem('dm_role')) === 'admin') && (
+                <>
+                  <p className="text-xs font-bold text-[#9ca3af] mt-4 mb-2 px-1 tracking-wider uppercase">Menu Admin</p>
+                  <button onClick={() => navigate("/documents")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span className="text-base">📄</span><span>Kelola Dokumen RAG</span>
+                  </button>
+                  <button onClick={() => navigate("/users")} className="w-full flex items-center gap-3 text-[#6b7280] hover:bg-gray-100 hover:text-[#111827] rounded-lg p-3 text-sm font-medium transition text-left">
+                    <span className="text-base">⚙️</span><span>Kelola Pengguna</span>
+                  </button>
+                </>
+              )}
+            </nav>
+
+            {/* KELOMPOK TERSEMAT (PINNED CHAT) */}
+            {pinnedList.length > 0 && (
+              <div className="mb-5">
+                <p className="text-xs font-bold text-[#9ca3af] mb-2 px-1 tracking-wider uppercase flex items-center gap-1">📌 Tersemat</p>
+                <div className="space-y-1.5">
+                  {pinnedList.map((s) => (
+                    <div 
+                      key={s.id} 
+                      onClick={() => loadOldSession(s.id)} 
+                      className={`relative flex items-center justify-between rounded-lg p-2.5 cursor-pointer border transition ${sessionId === s.id ? 'bg-white border-[#124090] shadow-sm' : 'bg-transparent border-transparent hover:bg-gray-200'}`}
+                    >
+                      <div className="min-w-0 flex-1 pr-1">
+                        <p className="text-xs font-semibold text-[#111827] truncate">{s.title || 'Percakapan Tanpa Judul'}</p>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === s.id ? null : s.id); }} className="text-gray-400 hover:text-[#124090] p-1 text-xs font-bold">•••</button>
+                      {activeMenuId === s.id && (
+                        <div ref={menuRef} className="absolute right-2 top-9 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 w-36 z-50 text-left">
+                          <button onClick={(e) => togglePinSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5">📌 Lepas Pin</button>
+                          <button onClick={(e) => closeSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 border-t border-gray-100">🗑 Hapus</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* KELOMPOK RIWAYAT STANDAR */}
+            <p className="text-xs font-bold text-[#9ca3af] mb-2 px-1 tracking-wider uppercase">Riwayat Percakapan</p>
+            <div className="space-y-1.5">
+              {sessions.length === 0 ? (
+                <p className="text-xs text-gray-400 px-1 italic">Belum ada riwayat.</p>
+              ) : (
+                regularList.map((s) => (
+                  <div 
+                    key={s.id} 
+                    onClick={() => loadOldSession(s.id)} 
+                    className={`relative flex items-center justify-between rounded-lg p-2.5 cursor-pointer border transition ${sessionId === s.id ? 'bg-white border-[#124090] shadow-sm' : 'bg-transparent border-transparent hover:bg-gray-200'}`}
+                  >
+                    <div className="min-w-0 flex-1 pr-1">
+                      <p className="text-xs font-medium text-[#111827] truncate">{s.title || 'Percakapan Tanpa Judul'}</p>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === s.id ? null : s.id); }} className="text-gray-400 hover:text-[#124090] p-1 text-xs font-bold">•••</button>
+                    {activeMenuId === s.id && (
+                      <div ref={menuRef} className="absolute right-2 top-9 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 w-36 z-50 text-left">
+                        <button onClick={(e) => togglePinSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5">📌 Pin Keatas</button>
+                        <button onClick={(e) => closeSession(s.id, e)} className="w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 border-t border-gray-100">🗑 Hapus</button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── AREA UTAMA: KONTEN CHAT CENTER ── */}
+        <div className="flex-1 flex flex-col bg-white relative min-w-0 h-full">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-36 md:pb-40">
+            
+            {/* RENDER KONDISIONAL CHAT KOSONG PILIHAN PREMIUM TUAN MUDA */}
+            {!sessionId ? (
+              <div className="flex h-full flex-col items-center justify-center text-center px-4 select-none my-auto">
+                {/* WATERMARK BRANDING ELEGAN */}
+                <h2 className="text-4xl md:text-5xl font-black tracking-tight text-gray-300 mb-2 font-sans">
+                  DeskMate
+                </h2>
+                
+                <h3 className="text-xl md:text-2xl font-bold text-[#111827] mt-4">
+                  How can I help you today?
+                </h3>
+                <p className="mt-2 text-sm text-[#6b7280] max-w-md">
+                  Ask me about IT issues, HR policies, or request a new service ticket.
+                </p>
+
+                <div className="mt-8">
+                  <p className="text-xs font-semibold text-[#9ca3af] tracking-wider uppercase mb-4">
+                    Try these prompts:
+                  </p>
+                  <div className="flex flex-wrap gap-2.5 justify-center max-w-xl">
+                    <button onClick={() => setInput("I need help resetting my password")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-[#374151] hover:bg-gray-50 hover:border-gray-300 transition shadow-sm cursor-pointer">I need help resetting my password</button>
+                    <button onClick={() => setInput("My VPN keeps disconnecting")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-[#374151] hover:bg-gray-50 hover:border-gray-300 transition shadow-sm cursor-pointer">My VPN keeps disconnecting</button>
+                    <button onClick={() => setInput("How do I request new software?")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-[#374151] hover:bg-gray-50 hover:border-gray-300 transition shadow-sm cursor-pointer">How do I request new software?</button>
+                    <button onClick={() => setInput("Show me HR remote work policy")} className="px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-[#374151] hover:bg-gray-50 hover:border-gray-300 transition shadow-sm cursor-pointer">Show me HR remote work policy</button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* ALUR CHAT BUBBLE */
+              messages.map((msg, index) => (
+                <div key={index} className="flex w-full">
+                  {msg.role === 'user' ? (
+                    <div className="ml-auto flex flex-col items-end gap-1.5 max-w-[85%] md:max-w-2xl w-full">
+                      {msg.image && (
+                        <img src={msg.image} alt="User Attachment" className="max-w-full rounded-2xl border border-gray-200 shadow-sm mb-1 object-cover max-h-48" />
+                      )}
+                      {msg.content && (
+                        <div className="rounded-2xl md:rounded-3xl rounded-br-sm bg-[#124090] px-4 md:px-5 py-3 md:py-3.5 text-white shadow-sm text-right">
+                          <p className="text-sm leading-relaxed text-left">{msg.content}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex max-w-[90%] md:max-w-3xl gap-3 md:gap-4 py-2">
+                      <div className="flex h-7 w-7 md:h-8 md:w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#003399] text-white shadow-sm mt-0.5">
+                        <span className="text-[9px] md:text-[10px] font-bold tracking-widest">AI</span>
+                      </div>
+                      <div className="pt-1 text-[#111827]">
+                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+
+            {isTyping && (
+              <div className="flex max-w-[90%] md:max-w-3xl gap-3 md:gap-4 py-2 opacity-50">
+                <div className="flex h-7 w-7 md:h-8 md:w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#003399] text-white mt-0.5"><span className="text-[9px] md:text-[10px] font-bold tracking-widest">AI</span></div>
+                <div className="pt-1.5 text-[#111827] flex items-center gap-1">
+                  <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* AREA INPUT UTAMA */}
+          <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4 bg-gradient-to-t from-white via-white to-transparent">
+            <div className="max-w-3xl mx-auto flex flex-col bg-[#f9fafb] border border-[#d1d5db] rounded-3xl p-1.5 md:p-2 shadow-sm focus-within:border-[#124090] focus-within:ring-1 focus-within:ring-[#124090] transition-all">
+              
+              {imagePreview && (
+                <div className="relative inline-block ml-3 mt-2 mb-1 w-16 h-16 rounded-xl border border-gray-300 overflow-hidden bg-white shadow-sm">
+                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  <button onClick={handleRemoveImage} className="absolute top-1 right-1 bg-black/60 hover:bg-black text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold transition">✕</button>
+                </div>
+              )}
+
+              <form onSubmit={handleSend} className="flex items-center w-full relative">
+                <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isTyping}
+                  className="p-2.5 text-[#6b7280] hover:text-[#124090] transition-colors rounded-full hover:bg-gray-200/50 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  title="Lampirkan Foto Komponen / Error"
+                >
+                  <svg className="h-5 w-5 transform rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                </button>
+
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  disabled={isTyping}
+                  placeholder={selectedImage ? "Tambahkan catatan keluhan..." : "Tanyakan panduan teknis pada DeskMate..."}
+                  className="flex-1 bg-transparent px-2 text-sm text-[#111827] outline-none min-w-0"
+                />
+
+                <button
+                  type="submit"
+                  disabled={isTyping || (!input.trim() && !selectedImage)}
+                  className="ml-1 aspect-square p-2 rounded-full bg-[#124090] text-white flex items-center justify-center transition hover:bg-[#0e306e] disabled:opacity-30 min-w-[36px]"
+                >
+                  <svg className="h-4 w-4 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9-7-9-7v14z" />
+                  </svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        {/* ── PANEL KANAN: CONTEXT & ACTIONS ── */}
+        <aside className="hidden lg:flex flex-col w-60 bg-[#f9fafb] border-l border-[#d1d5db] p-4 gap-4 overflow-y-auto flex-shrink-0 h-full">
+          <div>
+            <h3 className="text-sm font-bold text-[#111827] mb-1">Context & Actions</h3>
+            <p className="text-[11px] text-[#6b7280] leading-relaxed">Kelola kebutuhan tiket dan rujukan dokumen logis mesin di sini.</p>
+          </div>
+
+          <div className="border-b border-gray-200 pb-3">
+            <button 
+              onClick={createTicketFromChat}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#124090] text-white py-2.5 text-xs font-bold shadow-sm transition hover:bg-[#0e306e]"
+            >
+              <span>🎫</span> Create Ticket from Chat
+            </button>
+            <p className="text-[10px] text-[#6b7280] mt-1.5 text-center leading-normal">Otomatis merangkum riwayat obrolan ini menjadi tiket baru.</p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <p className="text-[10px] font-bold text-[#9ca3af] tracking-wider uppercase">Suggested Knowledge</p>
+            <div className="space-y-1.5">
+              <div className="flex gap-2 bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm">
+                <span className="text-sm">📄</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[#111827] truncate">Password Reset Guidelines</p>
+                  <p className="text-[9px] text-[#9ca3af]">IT Security • Updated 2w ago</p>
+                </div>
+              </div>
+              <div className="flex gap-2 bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm">
+                <span className="text-sm">🌐</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[#111827] truncate">VPN Troubleshooting Steps</p>
+                  <p className="text-[9px] text-[#9ca3af]">Network Ops • Updated 1m ago</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 mt-2">
+            <p className="text-[10px] font-bold text-[#9ca3af] tracking-wider uppercase">Your Active Tickets</p>
+            <div className="space-y-2">
+              {tickets.length === 0 ? (
+                <div className="text-center text-xs text-gray-400 py-2 border border-dashed border-gray-200 rounded-xl bg-white italic">Tidak ada tiket aktif</div>
+              ) : (
+                tickets.map((t) => (
+                  <div 
+                    key={t.id} 
+                    onClick={() => navigate(`/tickets/${t.id}`)}
+                    className="bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm"
+                  >
+                    <p className="text-[10px] font-bold text-[#124090]">{t.ticket_number}</p>
+                    <div className="flex justify-between items-center gap-1.5 mt-1">
+                      <p className="text-xs text-[#374151] truncate flex-1">{t.title}</p>
+                      <span className="text-[9px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-md">Open</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </aside>
+
       </div>
     </div>
   );
 }
-
-function NavItem({ icon, label, active, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      style={{ ...s.navItem, background: active ? "#EFF6FF" : hovered ? "#F9FAFB" : "transparent", color: active ? "#2563EB" : "#374151", fontWeight: active ? 600 : 400 }}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <span style={s.navIcon}>{icon}</span>
-      <span style={s.navLabel}>{label}</span>
-    </button>
-  );
-}
-
-function KnowledgeItem({ icon, title, meta }) {
-  return (
-    <div style={s.knowledgeItem}>
-      <div style={s.knowledgeIcon}>{icon}</div>
-      <div>
-        <div style={s.knowledgeTitle}>{title}</div>
-        <div style={s.knowledgeMeta}>{meta}</div>
-      </div>
-    </div>
-  );
-}
-
-// ── Styles ──────────────────────────────────────────────
-const s = {
-  root: { display: "flex", height: "100vh", background: "#F3F4F6", fontFamily: "'DM Sans','Segoe UI',sans-serif", overflow: "hidden" },
-
-  // Sidebar
-  sidebar: { width: 200, background: "#FFFFFF", borderRight: "1px solid #E5E7EB", display: "flex", flexDirection: "column", flexShrink: 0 },
-  sidebarLogo: { display: "flex", alignItems: "center", gap: 10, padding: "18px 16px", borderBottom: "1px solid #F3F4F6" },
-  logoIcon: { width: 32, height: 32, background: "#EFF6FF", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" },
-  logoText: { fontSize: 15, fontWeight: 700, color: "#111827" },
-  nav: { flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 },
-  navSection: { fontSize: 10, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.08em", padding: "12px 8px 4px", textTransform: "uppercase" },
-  navItem: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", width: "100%", transition: "background 0.12s" },
-  navIcon: { fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 },
-  navLabel: { fontSize: 13, lineHeight: 1.3 },
-  sidebarFooter: { padding: "12px 14px", borderTop: "1px solid #F3F4F6", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
-  avatarSmall: { width: 32, height: 32, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 },
-  footerName: { fontSize: 13, fontWeight: 600, color: "#111827" },
-  footerSub: { fontSize: 11, color: "#9CA3AF" },
-
-  // Center
-  center: { flex: 1, display: "flex", flexDirection: "column", background: "#FFFFFF", overflow: "hidden", borderRight: "1px solid #E5E7EB" },
-  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #F3F4F6" },
-  pageTitle: { fontSize: 17, fontWeight: 700, color: "#111827", margin: 0 },
-  bellBtn: { background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 8, display: "flex", alignItems: "center" },
-
-  // Tabs
-  tabBar: { display: "flex", alignItems: "center", gap: 4, padding: "8px 16px", borderBottom: "1px solid #F3F4F6", overflowX: "auto" },
-  tab: { display: "flex", alignItems: "center", gap: 6, padding: "4px 12px", borderRadius: 20, border: "1px solid #E5E7EB", background: "#F9FAFB", fontSize: 12, color: "#374151", cursor: "pointer", whiteSpace: "nowrap", maxWidth: 160 },
-  tabActive: { background: "#EFF6FF", borderColor: "#BFDBFE", color: "#2563EB" },
-  tabClose: { fontSize: 14, color: "#9CA3AF", lineHeight: 1, marginLeft: 2 },
-  newChatBtn: { padding: "4px 12px", borderRadius: 20, border: "1px dashed #D1D5DB", background: "transparent", fontSize: 12, color: "#6B7280", cursor: "pointer", whiteSpace: "nowrap" },
-
-  // Chat
-  chatArea: { flex: 1, overflow: "auto", padding: "16px 20px" },
-  emptyState: { height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 },
-  emptyIcon: { fontSize: 40, marginBottom: 8 },
-  emptyTitle: { fontSize: 20, fontWeight: 700, color: "#111827", margin: 0 },
-  emptySubtitle: { fontSize: 13, color: "#6B7280", margin: "4px 0 16px", textAlign: "center" },
-  promptsLabel: { fontSize: 12, color: "#9CA3AF", marginBottom: 10 },
-  prompts: { display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", maxWidth: 500 },
-  promptBtn: { padding: "7px 14px", borderRadius: 20, border: "1px solid #E5E7EB", background: "#F9FAFB", fontSize: 12, color: "#374151", cursor: "pointer" },
-  messages: { display: "flex", flexDirection: "column", gap: 12 },
-  msgRow: { display: "flex", gap: 8, alignItems: "flex-end" },
-  aiAvatar: { width: 28, height: 28, borderRadius: "50%", background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 },
-  userBubble: { background: "#2563EB", color: "#fff", padding: "10px 14px", borderRadius: "16px 16px 4px 16px", maxWidth: "70%", fontSize: 13, lineHeight: 1.5 },
-  aiBubble: { background: "#F3F4F6", color: "#111827", padding: "10px 14px", borderRadius: "16px 16px 16px 4px", maxWidth: "75%", fontSize: 13, lineHeight: 1.5 },
-  msgContent: { whiteSpace: "pre-wrap" },
-  sources: { fontSize: 11, color: "#6B7280", marginTop: 6, paddingTop: 6, borderTop: "1px solid #E5E7EB" },
-  loadingDot1: { animation: "bounce 1.2s infinite", animationDelay: "0s", color: "#9CA3AF", marginRight: 2 },
-  loadingDot2: { animation: "bounce 1.2s infinite", animationDelay: "0.2s", color: "#9CA3AF", marginRight: 2 },
-  loadingDot3: { animation: "bounce 1.2s infinite", animationDelay: "0.4s", color: "#9CA3AF" },
-  loadingDots: { display: "flex", gap: 4, alignItems: "center" },
-  dot: { width: 8, height: 8, borderRadius: "50%", background: "#9CA3AF", display: "inline-block", animation: "bounce 1.2s infinite" },
-
-  // Input
-  inputBar: { display: "flex", alignItems: "flex-end", gap: 8, padding: "12px 16px", borderTop: "1px solid #F3F4F6" },
-  attachBtn: { background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: 8, display: "flex", alignItems: "center", flexShrink: 0 },
-  textarea: { flex: 1, border: "1px solid #E5E7EB", borderRadius: 10, padding: "9px 13px", fontSize: 13, color: "#111827", outline: "none", resize: "none", fontFamily: "inherit", maxHeight: 120, overflowY: "auto", lineHeight: 1.5 },
-  sendBtn: { width: 36, height: 36, borderRadius: 8, background: "#2563EB", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  inputFooter: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px 10px" },
-  disclaimer: { fontSize: 11, color: "#9CA3AF" },
-  clearBtn: { background: "none", border: "none", fontSize: 11, color: "#9CA3AF", cursor: "pointer", padding: 0 },
-
-  // Right panel
-  rightPanel: { width: 220, background: "#FFFFFF", borderLeft: "1px solid #E5E7EB", padding: 16, display: "flex", flexDirection: "column", gap: 12, overflowY: "auto", flexShrink: 0 },
-  panelTitle: { fontSize: 14, fontWeight: 700, color: "#111827", margin: "0 0 4px" },
-  createTicketBtn: { display: "flex", alignItems: "center", justifyContent: "center", background: "#2563EB", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%" },
-  createTicketSub: { fontSize: 11, color: "#6B7280", margin: "0 0 4px", lineHeight: 1.4 },
-  panelSection: { fontSize: 10, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 4 },
-  knowledgeList: { display: "flex", flexDirection: "column", gap: 8 },
-  knowledgeItem: { display: "flex", gap: 8, alignItems: "flex-start", padding: "8px", background: "#F9FAFB", borderRadius: 8, cursor: "pointer" },
-  knowledgeIcon: { fontSize: 16, flexShrink: 0 },
-  knowledgeTitle: { fontSize: 12, fontWeight: 600, color: "#111827", marginBottom: 2 },
-  knowledgeMeta: { fontSize: 11, color: "#9CA3AF" },
-  ticketCard: { background: "#F9FAFB", borderRadius: 8, padding: "10px", cursor: "pointer", marginBottom: 4 },
-  ticketNum: { fontSize: 11, fontWeight: 700, color: "#2563EB", marginBottom: 4 },
-  ticketMeta: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  ticketTitle: { fontSize: 12, color: "#374151", flex: 1, marginRight: 4 },
-  ticketOpen: { fontSize: 10, fontWeight: 600, color: "#15803D", background: "#DCFCE7", padding: "1px 6px", borderRadius: 4 },
-  noTickets: { fontSize: 12, color: "#9CA3AF", textAlign: "center", padding: "12px 0" },
-};

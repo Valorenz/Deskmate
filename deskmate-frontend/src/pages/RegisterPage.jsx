@@ -1,8 +1,5 @@
 // src/pages/RegisterPage.jsx
-// -------------------------------------------------------
-// Halaman Register DeskMate
-// Integrasi dengan backend: POST /api/v1/auth/register
-// -------------------------------------------------------
+'use client';
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -58,89 +55,104 @@ export default function RegisterPage() {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        {/* Logo */}
-        <div style={styles.logoWrap}>
-          <div style={styles.logoIcon}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#2563EB"/>
-            </svg>
-          </div>
+    <div className="flex min-h-screen items-center justify-center bg-[#EAEEF2] px-4 py-8 font-sans">
+      <div className="w-full max-w-[400px] rounded-2xl bg-white p-6 sm:p-10 shadow-[0_4px_24px_rgba(0,0,0,0.08)]">
+        
+        {/* Branding Head EPSON */}
+        <div className="text-center mb-6">
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#003399] leading-none">
+            EPSON
+          </h1>
+          <span className="text-[10px] sm:text-xs font-bold text-[#6b7280] tracking-widest mt-1.5 block uppercase">
+            DESKMATE AI
+          </span>
         </div>
 
         {success ? (
-          <div style={styles.successBox}>
-            <div style={styles.successIcon}>✓</div>
-            <h2 style={styles.title}>Registrasi Berhasil!</h2>
-            <p style={styles.subtitle}>Akun Anda telah dibuat. Silakan login.</p>
-            <button style={styles.signInBtn} onClick={() => navigate("/login")}>
+          /* State Sukses Mendaftar */
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center text-2xl text-green-600 font-bold">
+              ✓
+            </div>
+            <h2 className="text-xl font-bold text-[#111827]">Registrasi Berhasil!</h2>
+            <p className="text-sm text-[#6B7280]">
+              Kredensial karyawan baru telah terdaftar di jaringan Epson DeskMate.
+            </p>
+            <button 
+              className="w-full mt-2 rounded-lg bg-[#003399] py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#002266]" 
+              onClick={() => navigate("/login")}
+            >
               Kembali ke Login
             </button>
           </div>
         ) : (
           <>
-            <h1 style={styles.title}>Buat Akun Baru</h1>
-            <p style={styles.subtitle}>Isi data diri Anda untuk mendaftar.</p>
+            {/* Judul yang Sudah Diselaraskan Sesuai Dokumen Tuan Muda */}
+            <div className="text-center mb-6">
+              <h2 className="text-lg sm:text-xl font-bold text-[#1a1f2e]">
+                Internal Personnel Onboarding
+              </h2>
+              <p className="mt-1 text-xs text-[#8a92a3]">
+                Register new authorized Epson employee account
+              </p>
+            </div>
 
+            {/* Error Message Box */}
             {error && (
-              <div style={styles.errorBox}>
-                <span>⚠</span> {error}
+              <div className="mb-4 rounded-lg p-2.5 px-3.5 text-xs font-medium bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626] flex items-center gap-1.5">
+                <span className="text-sm font-bold">⚠</span> {error}
               </div>
             )}
 
-            <form onSubmit={handleRegister} style={styles.form}>
-              <div style={styles.fieldGroup}>
-                <label style={styles.label}>Nama Lengkap</label>
+            {/* Form Pendaftaran Internal */}
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[#374151]">Nama Lengkap</label>
                 <input
                   name="full_name" type="text" placeholder="Budi Santoso"
                   value={form.full_name} onChange={handleChange} required
-                  style={styles.input}
-                  onFocus={(e) => (e.target.style.borderColor = "#2563EB")}
-                  onBlur={(e) => (e.target.style.borderColor = "#D1D5DB")}
+                  className="w-full rounded-lg border border-[#D1D5DB] bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none transition-all focus:border-[#003399] focus:ring-1 focus:ring-[#003399]"
                 />
               </div>
-              <div style={styles.fieldGroup}>
-                <label style={styles.label}>Email</label>
+              
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[#374151]">Email Corporate</label>
                 <input
                   name="email" type="email" placeholder="kamu@epson.co.id"
                   value={form.email} onChange={handleChange} required
-                  style={styles.input}
-                  onFocus={(e) => (e.target.style.borderColor = "#2563EB")}
-                  onBlur={(e) => (e.target.style.borderColor = "#D1D5DB")}
+                  className="w-full rounded-lg border border-[#D1D5DB] bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none transition-all focus:border-[#003399] focus:ring-1 focus:ring-[#003399]"
                 />
               </div>
-              <div style={styles.fieldGroup}>
-                <label style={styles.label}>Password</label>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[#374151]">Password</label>
                 <input
                   name="password" type="password" placeholder="Min. 6 karakter"
                   value={form.password} onChange={handleChange} required
-                  style={styles.input}
-                  onFocus={(e) => (e.target.style.borderColor = "#2563EB")}
-                  onBlur={(e) => (e.target.style.borderColor = "#D1D5DB")}
+                  className="w-full rounded-lg border border-[#D1D5DB] bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none transition-all focus:border-[#003399] focus:ring-1 focus:ring-[#003399]"
                 />
               </div>
-              <div style={styles.fieldGroup}>
-                <label style={styles.label}>Konfirmasi Password</label>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[#374151]">Konfirmasi Password</label>
                 <input
-                  name="confirm" type="password" placeholder="Ulangi password"
+                  name="confirm" type="password" placeholder="Ulangi password internal"
                   value={form.confirm} onChange={handleChange} required
-                  style={styles.input}
-                  onFocus={(e) => (e.target.style.borderColor = "#2563EB")}
-                  onBlur={(e) => (e.target.style.borderColor = "#D1D5DB")}
+                  className="w-full rounded-lg border border-[#D1D5DB] bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none transition-all focus:border-[#003399] focus:ring-1 focus:ring-[#003399]"
                 />
               </div>
+
               <button
                 type="submit" disabled={loading}
-                style={{ ...styles.signInBtn, opacity: loading ? 0.7 : 1, cursor: loading ? "not-allowed" : "pointer" }}
+                className="w-full rounded-lg bg-[#003399] py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#002266] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-h-[42px]"
               >
-                {loading ? "Mendaftar..." : "Sign up"}
+                {loading ? "Mendaftarkan Karyawan..." : "Register Account"}
               </button>
             </form>
 
-            <p style={styles.footer}>
-              Sudah punya akun?{" "}
-              <button type="button" style={styles.linkBtn} onClick={() => navigate("/login")}>
+            <p className="text-center text-sm text-[#6B7280] mt-5 mb-0">
+              Sudah punya akun resmi?{" "}
+              <button type="button" className="text-[#003399] font-semibold hover:underline bg-none border-none p-0 cursor-pointer" onClick={() => navigate("/login")}>
                 Sign in
               </button>
             </p>
@@ -150,22 +162,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-const styles = {
-  page: { minHeight: "100vh", background: "#F3F4F6", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans','Segoe UI',sans-serif", padding: "20px" },
-  card: { background: "#FFFFFF", borderRadius: "16px", padding: "40px 36px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" },
-  logoWrap: { display: "flex", justifyContent: "center", marginBottom: "20px" },
-  logoIcon: { width: "52px", height: "52px", background: "#EFF6FF", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center" },
-  title: { fontSize: "22px", fontWeight: "700", color: "#111827", textAlign: "center", margin: "0 0 6px 0" },
-  subtitle: { fontSize: "14px", color: "#6B7280", textAlign: "center", margin: "0 0 24px 0" },
-  errorBox: { background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: "8px", padding: "10px 14px", fontSize: "13px", color: "#DC2626", marginBottom: "16px", display: "flex", alignItems: "center", gap: "6px" },
-  form: { display: "flex", flexDirection: "column", gap: "16px" },
-  fieldGroup: { display: "flex", flexDirection: "column", gap: "6px" },
-  label: { fontSize: "14px", fontWeight: "500", color: "#374151" },
-  input: { padding: "10px 14px", borderRadius: "8px", border: "1px solid #D1D5DB", fontSize: "14px", color: "#111827", outline: "none", transition: "border-color 0.15s", background: "#FFFFFF" },
-  signInBtn: { background: "#2563EB", color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "11px", fontSize: "15px", fontWeight: "600", cursor: "pointer", width: "100%" },
-  footer: { textAlign: "center", fontSize: "13px", color: "#6B7280", marginTop: "20px", marginBottom: "0" },
-  linkBtn: { background: "none", border: "none", fontSize: "13px", color: "#2563EB", fontWeight: "600", cursor: "pointer", padding: "0" },
-  successBox: { display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" },
-  successIcon: { width: "56px", height: "56px", background: "#D1FAE5", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", color: "#059669" },
-};
