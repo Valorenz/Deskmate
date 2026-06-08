@@ -52,6 +52,7 @@ export default function LoginPage() {
       const profile = await profileRes.json();
       storage.setItem("dm_role", profile.role || "employee");
       storage.setItem("dm_full_name", profile.full_name || "");
+      storage.setItem("dm_avatar_url", profile.avatar_url || "");
 
       navigate("/dashboard");
     } catch (err) {

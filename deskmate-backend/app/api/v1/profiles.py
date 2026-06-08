@@ -315,6 +315,7 @@ async def revoke_session(
     summary="Upload foto profil",
 )
 async def upload_my_avatar(
+    request: Request,
     current_user: CurrentUser,
     file: UploadFile = File(..., description="File gambar JPEG/PNG/WebP"),
     db: AsyncSession = Depends(get_db),
@@ -342,16 +343,31 @@ async def upload_my_avatar(
     ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
     storage_path = f"{current_user.sub}/avatar.{ext}"
 
+    from app.core.config import settings
+
+    auth_header = request.headers.get("Authorization")
+    token = None
+    if auth_header and " " in auth_header:
+        token = auth_header.split(" ")[1]
+    if not token:
+        token = settings.SUPABASE_ANON_KEY
+
     try:
-        from app.api.v1.documents import get_supabase
-        supabase = get_supabase()
+        from supabase import create_client, ClientOptions
+        
+        supabase = create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_ANON_KEY,
+            options=ClientOptions(
+                headers={"Authorization": f"Bearer {token}"}
+            )
+        )
         supabase.storage.from_("avatars").upload(
             path=storage_path,
             file=file_bytes,
             file_options={"content-type": file_type, "x-upsert": "true"},
         )
         
-        from app.core.config import settings
         avatar_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/avatars/{storage_path}"
     except Exception as e:
         logger.error(f"Gagal upload avatar ke Supabase Storage: {e}")

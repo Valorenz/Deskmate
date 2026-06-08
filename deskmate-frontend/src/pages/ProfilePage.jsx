@@ -71,6 +71,11 @@ export default function ProfilePage() {
           phone:       p.phone || "",
           department:  p.department || "",
         });
+        if (!isAdminView) {
+          const storage = localStorage.getItem("dm_token") ? localStorage : sessionStorage;
+          storage.setItem("dm_full_name", p.full_name || "");
+          storage.setItem("dm_avatar_url", p.avatar_url || "");
+        }
       }
     } finally { setLoading(false); }
   }

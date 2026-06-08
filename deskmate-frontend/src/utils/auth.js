@@ -21,6 +21,10 @@ export function getFullName() {
   return localStorage.getItem("dm_full_name") || sessionStorage.getItem("dm_full_name") || "";
 }
 
+export function getAvatarUrl() {
+  return localStorage.getItem("dm_avatar_url") || sessionStorage.getItem("dm_avatar_url") || "";
+}
+
 export function getUserId() {
   return localStorage.getItem("dm_user_id") || sessionStorage.getItem("dm_user_id") || "";
 }
@@ -30,7 +34,7 @@ export function isLoggedIn() {
 }
 
 export function logout() {
-  ["dm_token", "dm_refresh_token", "dm_user_id", "dm_email", "dm_role", "dm_full_name"].forEach((key) => {
+  ["dm_token", "dm_refresh_token", "dm_user_id", "dm_email", "dm_role", "dm_full_name", "dm_avatar_url"].forEach((key) => {
     localStorage.removeItem(key);
     sessionStorage.removeItem(key);
   });

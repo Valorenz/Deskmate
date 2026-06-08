@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch, getFullName, getRole, logout } from "../utils/auth";
+import { apiFetch, getFullName, getRole, getAvatarUrl, logout } from "../utils/auth";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -195,8 +195,8 @@ export default function DashboardPage() {
       {/* ─── TOP HEADER (MATCHES CHATBOT HEADER) ─── */}
       <header className="fixed top-0 left-0 right-0 flex h-14 md:h-16 items-center justify-between border-b border-[#d1d5db] bg-white px-3 md:px-6 shadow-sm z-30">
         <div className="flex items-center gap-2 md:gap-4">
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="rounded-lg p-2 text-[#6b7280] hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             <svg className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -233,11 +233,15 @@ export default function DashboardPage() {
           </button>
 
           <div className="h-6 w-px bg-gray-300 mx-1 md:mx-2 hidden sm:block"></div>
-          
+
           <div onClick={() => navigate("/profile")} className="flex items-center gap-1 md:gap-2 pl-1 cursor-pointer hover:opacity-80 transition-opacity select-none">
-            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
-              {fullName.charAt(0).toUpperCase()}
-            </div>
+            {profile?.avatar_url || getAvatarUrl() ? (
+              <img src={profile?.avatar_url || getAvatarUrl()} alt="Avatar" className="flex h-8 w-8 md:h-9 md:w-9 rounded-full object-cover shadow-sm border border-slate-200" />
+            ) : (
+              <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
+                {fullName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="hidden md:flex flex-col text-left">
               <span className="text-xs font-bold text-[#111827]">{fullName}</span>
               <span className="text-[10px] text-[#6b7280]">
@@ -258,7 +262,7 @@ export default function DashboardPage() {
         <div className={`fixed md:relative inset-y-0 left-0 z-40 bg-[#f8fafd] border-r border-gray-200/80 flex flex-col transition-all duration-300 ease-in-out w-[280px] md:w-64 flex-shrink-0 ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:-ml-64 md:translate-x-0 md:opacity-100'}`}>
           <div className="p-4 flex-1 overflow-y-auto relative">
             <button onClick={() => navigate("/chat")} className="w-full rounded-full border border-[#d1d5db] bg-white text-[#111827] py-2.5 text-sm font-semibold transition hover:bg-gray-50 mb-6 shadow-sm">+ Chat Baru</button>
-            
+
             <p className="text-xs font-bold text-[#9ca3af] mb-3 px-1 tracking-wider uppercase">Menu Navigasi</p>
             <nav className="space-y-1 mb-6">
               <span className="flex items-center gap-3 bg-[#e5e7eb] text-[#111827] rounded-lg p-3 text-sm font-semibold cursor-default">
@@ -298,11 +302,15 @@ export default function DashboardPage() {
               )}
             </nav>
           </div>
-          
+
           <div className="p-4 border-t border-gray-200/80 flex items-center gap-3 cursor-pointer hover:bg-gray-100/50 transition-colors" onClick={() => navigate("/profile")}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs">
-              {fullName.charAt(0).toUpperCase()}
-            </div>
+            {profile?.avatar_url || getAvatarUrl() ? (
+              <img src={profile?.avatar_url || getAvatarUrl()} alt="Avatar" className="h-8 w-8 rounded-full object-cover shadow-sm border border-slate-200" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs">
+                {fullName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold text-[#111827] truncate">{fullName}</div>
               <div className="text-[10px] text-[#6b7280]">Profile & Settings</div>
@@ -312,21 +320,21 @@ export default function DashboardPage() {
 
         {/* ── AREA UTAMA KONTEN DASHBOARD (PREMIUM CORPORATE DECK STYLE) ── */}
         <main className="flex-1 overflow-y-auto bg-[#f0f4f9] p-4 md:p-6 space-y-6">
-          
+
           {/* Section Header */}
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-extrabold text-[#124090] tracking-widest uppercase">Epson Factory Hub</span>
+              <span className="text-[10px] font-extrabold text-[#124090] tracking-widest uppercase">Epson Management Hub</span>
               <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mt-1">Dashboard Karyawan</h2>
               <p className="text-xs text-[#6b7280] mt-0.5">Kelola antrean bantuan IT helpdesk operasional Anda dan pantuan troubleshoot mesin.</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            
+
             {/* LEFT COLUMN: STATS, QUICK ACTIONS, RECENT ACTIVITY */}
             <div className="lg:col-span-2 space-y-6">
-              
+
               {/* Stat Cards Row */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
@@ -373,7 +381,7 @@ export default function DashboardPage() {
               <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm">
                 <h3 className="text-xs font-extrabold text-slate-400 tracking-wider mb-4 uppercase">Akses Cepat</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  
+
                   <button onClick={() => navigate("/tickets/create")} className="flex items-center gap-4 bg-white border border-gray-200 hover:border-blue-400 hover:shadow-md rounded-2xl p-4 transition-all duration-300 text-left w-full cursor-pointer group">
                     <div className="h-11 w-11 rounded-xl bg-slate-50 group-hover:bg-blue-50 text-[#124090] text-xl font-bold flex items-center justify-center transition-colors">
                       <svg className="h-5 w-5 text-[#124090]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -441,14 +449,14 @@ export default function DashboardPage() {
 
             {/* RIGHT COLUMN: SYSTEM ALERTS, PROFILE DECK CARD */}
             <div className="space-y-6">
-              
+
               {/* System Alerts Deck */}
               <div className="bg-white border border-gray-200/60 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                   <h3 className="text-xs font-bold text-[#9ca3af] tracking-wider uppercase">Pemberitahuan Sistem</h3>
                   <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">2</span>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="flex gap-3 items-start p-3 bg-blue-50/40 rounded-xl border border-blue-100/50">
                     <div className="h-7 w-7 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
@@ -478,14 +486,18 @@ export default function DashboardPage() {
 
               {/* Profile Deck Card */}
               <div className="bg-white border border-gray-200/60 rounded-2xl p-6 shadow-sm flex flex-col items-center select-none">
-                <div className="h-16 w-16 rounded-full bg-[#124090] text-white flex items-center justify-center text-2xl font-black shadow-sm mb-4">
-                  {fullName.charAt(0).toUpperCase()}
-                </div>
+                {profile?.avatar_url || getAvatarUrl() ? (
+                  <img src={profile?.avatar_url || getAvatarUrl()} alt="Avatar" className="h-16 w-16 rounded-full object-cover shadow-md border border-slate-200 mb-4" />
+                ) : (
+                  <div className="h-16 w-16 rounded-full bg-[#124090] text-white flex items-center justify-center text-2xl font-black shadow-sm mb-4">
+                    {fullName.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <h3 className="text-sm font-black text-slate-800 text-center truncate w-full">{fullName}</h3>
                 <p className="text-xs text-gray-400 text-center mt-1 w-full truncate">{profile?.department || "Operasional Manufaktur"}</p>
-                
+
                 <div className="w-full h-px bg-gray-100 my-4" />
-                
+
                 <div className="w-full space-y-2.5">
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-400">ID Karyawan</span>
@@ -500,7 +512,7 @@ export default function DashboardPage() {
                     <span className="font-bold text-slate-800 capitalize">{role}</span>
                   </div>
                 </div>
-                
+
                 <button onClick={handleLogout} className="mt-6 w-full py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs font-bold transition-colors border-none cursor-pointer">
                   Keluar / Logout
                 </button>

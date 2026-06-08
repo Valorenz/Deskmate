@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { logout, getAvatarUrl } from '../utils/auth';
 
 // Utility to format markdown and custom safety/danger tags into rich, high-end HTML layouts
 function formatMessageContent(text) {
@@ -126,6 +127,7 @@ export default function ChatPage() {
 
   // ── FITUR DINAMISASI PROFIL ──
   const [fullName, setFullName] = useState("User");
+  const [userRole, setUserRole] = useState("Employee");
 
   // ── FITUR GEMINI: Pinned Sesi & Dropdown Trigger ──
   const [pinnedSessions, setPinnedSessions] = useState(() => {
@@ -172,6 +174,11 @@ export default function ChatPage() {
 
     const savedName = localStorage.getItem('dm_full_name') || sessionStorage.getItem('dm_full_name');
     if (savedName) setFullName(savedName);
+
+    const savedRole = localStorage.getItem('dm_role') || sessionStorage.getItem('dm_role');
+    if (savedRole) {
+      setUserRole(savedRole.charAt(0).toUpperCase() + savedRole.slice(1));
+    }
 
     try {
       // 1. Fetch Sesi Percakapan
@@ -419,6 +426,11 @@ export default function ChatPage() {
     }
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
   const createTicketFromChat = () => {
     if (!sessionId || messages.length === 0) {
       navigate("/tickets/create");
@@ -519,12 +531,16 @@ export default function ChatPage() {
           <div className="h-6 w-px bg-gray-300 mx-1 md:mx-2 hidden sm:block"></div>
 
           <div onClick={() => navigate("/profile")} className="flex items-center gap-1 md:gap-2 pl-1 cursor-pointer hover:opacity-80 transition-opacity select-none">
-            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
-              {fullName.charAt(0).toUpperCase()}
-            </div>
+            {getAvatarUrl() ? (
+              <img src={getAvatarUrl()} alt="Avatar" className="flex h-8 w-8 md:h-9 md:w-9 rounded-full object-cover shadow-sm border border-slate-200" />
+            ) : (
+              <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
+                {fullName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="hidden md:flex flex-col text-left">
               <span className="text-xs font-bold text-[#111827]">{fullName}</span>
-              <span className="text-[10px] text-[#6b7280]">PM / Admin</span>
+              <span className="text-[10px] text-[#6b7280]">{userRole}</span>
             </div>
           </div>
         </div>
@@ -633,6 +649,20 @@ export default function ChatPage() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-gray-200/80 flex items-center gap-3 cursor-pointer hover:bg-gray-100/50 transition-colors" onClick={() => navigate("/profile")}>
+            {getAvatarUrl() ? (
+              <img src={getAvatarUrl()} alt="Avatar" className="h-8 w-8 rounded-full object-cover shadow-sm border border-slate-200" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs">
+                {fullName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-[#111827] truncate">{fullName}</div>
+              <div className="text-[10px] text-[#6b7280]">Profile & Settings</div>
             </div>
           </div>
         </div>
@@ -746,18 +776,26 @@ export default function ChatPage() {
             <div className="flex flex-col gap-2">
               <p className="text-[10px] font-bold text-[#9ca3af] tracking-wider uppercase">Suggested Knowledge</p>
               <div className="space-y-1.5">
-                <div className="flex gap-2 bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm">
+                <a
+                  href="/documents/password_reset_guidelines.txt"
+                  download="password_reset_guidelines.txt"
+                  className="block flex gap-2 bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm text-left decoration-none"
+                >
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-[#111827] truncate">Password Reset Guidelines</p>
                     <p className="text-[9px] text-[#9ca3af]">IT Security • Updated 2w ago</p>
                   </div>
-                </div>
-                <div className="flex gap-2 bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm">
+                </a>
+                <a
+                  href="/documents/vpn_troubleshooting_steps.txt"
+                  download="vpn_troubleshooting_steps.txt"
+                  className="block flex gap-2 bg-white border border-gray-200 rounded-xl p-2.5 cursor-pointer hover:border-[#124090] transition shadow-2zm text-left decoration-none"
+                >
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-[#111827] truncate">VPN Troubleshooting Steps</p>
                     <p className="text-[9px] text-[#9ca3af]">Network Ops • Updated 1m ago</p>
                   </div>
-                </div>
+                </a>
               </div>
             </div>
 

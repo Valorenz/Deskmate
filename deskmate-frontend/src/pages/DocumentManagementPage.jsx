@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch, getFullName, getRole, logout } from "../utils/auth";
+import { apiFetch, getFullName, getRole, getAvatarUrl, logout } from "../utils/auth";
 
 const INDEXING_STYLE = {
   indexed:    { label: "Active",      bg: "#DCFCE7", color: "#15803D" },
@@ -94,6 +94,27 @@ export default function DocumentManagementPage() {
         setUploadError(d?.detail || "Upload gagal.");
       }
     } finally { setUploading(false); }
+  }
+
+  async function handleDeleteDocument(docId, docTitle) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus dokumen "${docTitle}"? Tindakan ini akan menghapus dokumen dari database RAG.`)) {
+      return;
+    }
+    try {
+      const r = await apiFetch(`/api/v1/documents/${docId}`, {
+        method: "DELETE"
+      });
+      if (r?.ok || r?.status === 204) {
+        setSelected(null);
+        loadDocuments();
+      } else {
+        const d = await r?.json();
+        alert(d?.detail || "Gagal menghapus dokumen.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan koneksi saat menghapus dokumen.");
+    }
   }
 
   const handleLogout = () => {
@@ -270,9 +291,13 @@ export default function DocumentManagementPage() {
           <div className="h-6 w-px bg-gray-300 mx-1 md:mx-2 hidden sm:block"></div>
 
           <div onClick={() => navigate("/profile")} className="flex items-center gap-1 md:gap-2 pl-1 cursor-pointer hover:opacity-80 transition-opacity select-none">
-            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
-              {fullName.charAt(0).toUpperCase()}
-            </div>
+            {profile?.avatar_url || getAvatarUrl() ? (
+              <img src={profile?.avatar_url || getAvatarUrl()} alt="Avatar" className="flex h-8 w-8 md:h-9 md:w-9 rounded-full object-cover shadow-sm border border-slate-200" />
+            ) : (
+              <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs md:text-sm">
+                {fullName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="hidden md:flex flex-col text-left">
               <span className="text-xs font-bold text-[#111827]">{fullName}</span>
               <span className="text-[10px] text-[#6b7280]">
@@ -335,9 +360,13 @@ export default function DocumentManagementPage() {
           </div>
 
           <div className="p-4 border-t border-gray-200/80 flex items-center gap-3 cursor-pointer hover:bg-gray-100/50 transition-colors" onClick={() => navigate("/profile")}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs">
-              {fullName.charAt(0).toUpperCase()}
-            </div>
+            {profile?.avatar_url || getAvatarUrl() ? (
+              <img src={profile?.avatar_url || getAvatarUrl()} alt="Avatar" className="h-8 w-8 rounded-full object-cover shadow-sm border border-slate-200" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#124090] font-bold text-white shadow-sm text-xs">
+                {fullName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold text-[#111827] truncate">{fullName}</div>
               <div className="text-[10px] text-[#6b7280]">Profile & Settings</div>
@@ -606,11 +635,14 @@ export default function DocumentManagementPage() {
                       </svg>
                       Replace File
                     </button>
-                    <button className="flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 py-1.5 rounded-xl text-[10px] md:text-xs font-bold text-red-600 transition">
+                    <button
+                      onClick={() => handleDeleteDocument(selected.id, selected.title)}
+                      className="flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 py-1.5 rounded-xl text-[10px] md:text-xs font-bold text-red-600 transition cursor-pointer"
+                    >
                       <svg className="h-3.5 w-3.5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
-                      Archive
+                      Delete
                     </button>
                   </div>
                 </div>

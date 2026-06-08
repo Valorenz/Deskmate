@@ -1,0 +1,32 @@
+==================================================
+EPSON DESKMATE - NETWORK OPERATIONS
+VPN TROUBLESHOOTING STEPS
+==================================================
+Document ID: NET-SOP-104
+Version: 1.4
+Last Updated: 1 month ago
+Classification: Internal Use Only
+
+OVERVIEW
+This document provides troubleshooting steps for remote employees experiencing connectivity issues with the Epson Corporate VPN (GlobalProtect/Pulse Secure).
+
+TROUBLESHOOTING STEPS:
+1. Verify Your Internet Connection:
+   - Ensure your local Wi-Fi or ethernet connection is stable.
+   - Try browsing to a public website (e.g., google.com) to confirm access.
+2. Check VPN Credentials:
+   - Ensure your Active Directory credentials are correct.
+   - If your password was recently changed, update it in your VPN client settings.
+3. Multi-Factor Authentication (MFA):
+   - Make sure you approve the MFA push notification on your mobile device within 30 seconds.
+4. Clear DNS Cache:
+   - Open Command Prompt (Windows) and type: ipconfig /flushdns
+   - Open Terminal (macOS) and type: sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
+5. Change Gateway:
+   - If the primary gateway is slow, open the VPN client and switch to the secondary gateway (e.g., vpn-sec.epson.com).
+6. Restart Services:
+   - Restart the VPN client application.
+   - If issues persist, reboot your computer.
+
+For assistance, contact NetOps at netops@epson.co.id or open a high-priority ticket in DeskMate.
+==================================================
