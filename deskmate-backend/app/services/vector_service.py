@@ -15,6 +15,7 @@
 # "unit tidak merespons dan layar gelap" karena maknanya mirip.
 # -------------------------------------------------------
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -125,9 +126,22 @@ class VectorService:
 
         logger.info(f"  Dokumen dipecah menjadi {len(chunks)} chunks")
 
-        # Langkah 2: Buat embedding untuk semua chunks sekaligus (batch)
-        # Lebih efisien daripada embed satu per satu
-        embeddings = await self._embedding_model.aembed_documents(chunks)
+        # Langkah 2: Buat embedding dengan pembagian batch (mencegah rate limit Gemini API 429)
+        embeddings = []
+        batch_size = 5  # Mengirim 5 chunk per request agar tidak menyentuh limit
+        total_batches = (len(chunks) + batch_size - 1) // batch_size
+        
+        for i in range(0, len(chunks), batch_size):
+            current_batch = chunks[i:i + batch_size]
+            current_index = i // batch_size + 1
+            logger.info(f"    Memproses batch embedding {current_index}/{total_batches}...")
+            
+            batch_embeddings = await self._embedding_model.aembed_documents(current_batch)
+            embeddings.extend(batch_embeddings)
+            
+            # Beri jeda kecil antar batch untuk menghormati rate limit API gratisan
+            if i + batch_size < len(chunks):
+                await asyncio.sleep(1.5)
 
         # Langkah 3: Siapkan data untuk disimpan ke ChromaDB
         chunk_ids = []
