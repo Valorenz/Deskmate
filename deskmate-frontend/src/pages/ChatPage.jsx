@@ -7,12 +7,12 @@ import { useNavigate } from 'react-router-dom';
 // Utility to format markdown and custom safety/danger tags into rich, high-end HTML layouts
 function formatMessageContent(text) {
   if (!text) return "";
-  
+
   const lines = text.split('\n');
   const formattedLines = [];
-  
+
   let inList = false;
-  
+
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i].trim();
     if (!line) {
@@ -23,10 +23,10 @@ function formatMessageContent(text) {
       formattedLines.push('<div class="h-2"></div>');
       continue;
     }
-    
+
     // Convert bold tags **text** into <strong> tags
     let processedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
+
     // Check for Danger Alerts (🚨 or contains BAHAYA:)
     if (line.startsWith('🚨') || line.toUpperCase().includes('BAHAYA:')) {
       if (inList) {
@@ -45,7 +45,7 @@ function formatMessageContent(text) {
       `);
       continue;
     }
-    
+
     // Check for Safety Warning Alerts (⚠️ or contains PERINGATAN:)
     if (line.startsWith('⚠️') || line.toUpperCase().includes('PERINGATAN KESELAMATAN') || line.toUpperCase().includes('PERINGATAN:')) {
       if (inList) {
@@ -64,7 +64,7 @@ function formatMessageContent(text) {
       `);
       continue;
     }
-    
+
     // Check for bullet list items
     if (line.startsWith('- ') || line.startsWith('* ')) {
       if (!inList) {
@@ -75,7 +75,7 @@ function formatMessageContent(text) {
       formattedLines.push(`<li class="text-xs md:text-sm text-[#374151] leading-relaxed">${cleanText}</li>`);
       continue;
     }
-    
+
     // Check for numbered list items (e.g. 1. , 2. )
     const numberedMatch = line.match(/^(\d+)\.\s+(.*)/);
     if (numberedMatch) {
@@ -93,7 +93,7 @@ function formatMessageContent(text) {
       `);
       continue;
     }
-    
+
     // Regular plain paragraph line
     if (inList) {
       formattedLines.push('</ul>');
@@ -101,11 +101,11 @@ function formatMessageContent(text) {
     }
     formattedLines.push(`<p class="text-xs md:text-sm text-[#374151] leading-relaxed text-left my-1.5">${processedLine}</p>`);
   }
-  
+
   if (inList) {
     formattedLines.push('</ul>');
   }
-  
+
   return formattedLines.join('\n');
 }
 
@@ -539,7 +539,7 @@ export default function ChatPage() {
         {/* ── SIDEBAR PANEL LEFT ── */}
         <div className={`fixed md:relative inset-y-0 left-0 z-40 bg-[#f8fafd] border-r border-gray-200/80 flex flex-col transition-all duration-300 ease-in-out w-[280px] md:w-64 flex-shrink-0 ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:-ml-64 md:translate-x-0 md:opacity-100'}`}>
           <div className="p-4 flex-1 overflow-y-auto relative">
-            <button onClick={handleNewChat} className="w-full rounded-full border border-[#d1d5db] bg-white text-[#111827] py-2.5 text-sm font-semibold transition hover:bg-gray-50 mb-6 shadow-sm">+ Percakapan Baru</button>
+            <button onClick={handleNewChat} className="w-full rounded-full border border-[#d1d5db] bg-white text-[#111827] py-2.5 text-sm font-semibold transition hover:bg-gray-50 mb-6 shadow-sm">+ Chat Baru</button>
 
             <p className="text-xs font-bold text-[#9ca3af] mb-3 px-1 tracking-wider uppercase">Menu Navigasi</p>
             <nav className="space-y-1 mb-6">

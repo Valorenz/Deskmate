@@ -28,6 +28,7 @@ class TicketUpdate(BaseModel):
     priority: Literal["low", "medium", "high", "critical"] | None = None
     status: Literal["open", "in_progress", "resolved", "closed"] | None = None
     assigned_to: uuid.UUID | None = None
+    rating: int | None = Field(None, ge=1, le=5)
 
 
 class TicketResponse(BaseModel):
@@ -42,6 +43,7 @@ class TicketResponse(BaseModel):
     priority: str
     status: str
     attachment_ids: list[uuid.UUID]
+    rating: int | None = None
     resolved_at: datetime | None
     created_at: datetime
     updated_at: datetime

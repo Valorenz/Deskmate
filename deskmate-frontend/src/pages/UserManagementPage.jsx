@@ -51,12 +51,46 @@ export default function UserManagementPage() {
     }
     return true;
   });
+  
+  // Dynamic department state
+  const [departments, setDepartments] = useState([]);
+  
+  // Audit log modal states
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+
+  // Send message modal states
+  const [showSendMsgModal, setShowSendMsgModal] = useState(false);
+  const [msgRecipient, setMsgRecipient] = useState(null);
+  const [msgSubject, setMsgSubject] = useState("");
+  const [msgBody, setMsgBody] = useState("");
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [msgError, setMsgError] = useState("");
+  const [msgSuccess, setMsgSuccess] = useState("");
+
   const PAGE_SIZE = 10;
 
   useEffect(() => {
     loadProfile();
     loadUsers();
-  }, [page, roleFilter, deptFilter]);
+  }, [page, roleFilter, deptFilter, search]);
+
+  useEffect(() => {
+    async function loadDepts() {
+      try {
+        const r = await apiFetch("/api/v1/profiles/");
+        if (r?.ok) {
+          const all = await r.json();
+          const uniqueDepts = [...new Set(all.map(u => u.department).filter(Boolean))];
+          setDepartments(uniqueDepts);
+        }
+      } catch (err) {
+        console.error("Gagal memuat list departemen", err);
+      }
+    }
+    loadDepts();
+  }, []);
 
   async function loadProfile() {
     const r = await apiFetch("/api/v1/profiles/me");
@@ -66,23 +100,83 @@ export default function UserManagementPage() {
   async function loadUsers() {
     setLoading(true);
     try {
-      const r = await apiFetch(`/api/v1/profiles/me`);
-      const mockUsers = [
-        { id: "1", full_name: "Sarah Connor",  email: "sarah.c@company.com",  role: "admin",      department: "IT Support",       is_active: true,  employee_id: "EPS-001" },
-        { id: "2", full_name: "Michael Chang",  email: "m.chang@company.com",  role: "supervisor", department: "Engineering",       is_active: true,  employee_id: "EPS-002" },
-        { id: "3", full_name: "Emily Davis",    email: "e.davis@company.com",  role: "employee",   department: "Human Resources",  is_active: false, employee_id: null },
-        { id: "4", full_name: "James Wilson",   email: "j.wilson@company.com", role: "employee",   department: "Marketing",        is_active: false, employee_id: "EPS-004" },
-      ];
-
-      if (r?.ok) {
-        const me = await r.json();
-        mockUsers[0] = { ...mockUsers[0], full_name: me.full_name || "Admin User", email: me.employee_id || "admin@company.com", department: me.department || "IT Support" };
+      const params = new URLSearchParams();
+      if (roleFilter !== "All Roles") {
+        params.append("role", roleFilter);
       }
+      if (deptFilter !== "All Departments") {
+        params.append("department", deptFilter);
+      }
+      if (search) {
+        params.append("search", search);
+      }
+      
+      const r = await apiFetch(`/api/v1/profiles/?${params.toString()}`);
+      if (r?.ok) {
+        const data = await r.json();
+        setUsers(data);
+        const activeCount = data.filter(u => u.is_active).length;
+        const adminCount = data.filter(u => u.role === "admin").length;
+        setStats({
+          total: data.length,
+          active: activeCount,
+          admins: adminCount
+        });
+        setTotal(data.length);
+      } else {
+        console.error("Gagal memuat daftar pengguna.");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      setUsers(mockUsers);
-      setTotal(248);
-      setStats({ total: 248, active: 235, admins: 12 });
-    } finally { setLoading(false); }
+  async function loadAuditLogs() {
+    setLoadingAudit(true);
+    try {
+      const r = await apiFetch("/api/v1/profiles/audit-logs");
+      if (r?.ok) {
+        setAuditLogs(await r.json());
+      } else {
+        console.error("Gagal memuat audit log.");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingAudit(false);
+    }
+  }
+
+  async function handleSendMessage() {
+    if (!msgSubject || !msgBody) {
+      setMsgError("Subjek dan isi pesan wajib diisi.");
+      return;
+    }
+    setSendingMsg(true);
+    setMsgError("");
+    setMsgSuccess("");
+    try {
+      const r = await apiFetch(`/api/v1/profiles/${msgRecipient.id}/send-message`, {
+        method: "POST",
+        body: JSON.stringify({ subject: msgSubject, content: msgBody }),
+      });
+      if (r?.ok) {
+        setMsgSuccess("Pesan email berhasil dikirim!");
+        setTimeout(() => {
+          setShowSendMsgModal(false);
+          setMsgRecipient(null);
+        }, 1500);
+      } else {
+        const d = await r?.json();
+        setMsgError(d?.detail || "Gagal mengirim pesan.");
+      }
+    } catch (err) {
+      setMsgError("Error koneksi ke server.");
+    } finally {
+      setSendingMsg(false);
+    }
   }
 
   async function handleInvite() {
@@ -134,19 +228,18 @@ export default function UserManagementPage() {
   };
 
   const getLastLogin = (user) => {
-    if (!user.is_active && !user.employee_id) return "Never";
-    if (!user.is_active) return "Oct 12, 2023";
-    const hours = Math.floor(Math.random() * 24);
-    if (hours === 0) return "Just now";
-    if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-    return "Yesterday, 14:30";
+    if (!user.is_active) return "Deactivated";
+    if (!user.updated_at) return "Never";
+    return new Date(user.updated_at).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    });
   };
 
-  const filtered = users.filter(u =>
-    (!search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())) &&
-    (roleFilter === "All Roles" || u.role === roleFilter.toLowerCase()) &&
-    (deptFilter === "All Departments" || u.department === deptFilter)
-  );
+  const filtered = users;
+  const startIndex = (page - 1) * PAGE_SIZE;
+  const paginatedUsers = filtered.slice(startIndex, startIndex + PAGE_SIZE);
 
   // ── CURSOR SPARKS EFFECT ──
   useEffect(() => {
@@ -391,7 +484,10 @@ export default function UserManagementPage() {
             <div className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase block">Audit Log</span>
-                <button className="text-xs font-extrabold text-[#003399] hover:underline mt-2 flex items-center gap-1">
+                <button
+                  onClick={() => { loadAuditLogs(); setShowAuditModal(true); }}
+                  className="text-xs font-extrabold text-[#003399] hover:underline mt-2 flex items-center gap-1"
+                >
                   View Activity
                   <svg className="h-3.5 w-3.5 text-[#003399] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -444,12 +540,9 @@ export default function UserManagementPage() {
                   className="appearance-none pl-3 pr-8 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
                 >
                   <option>All Departments</option>
-                  <option>IT Support</option>
-                  <option>Engineering</option>
-                  <option>Human Resources</option>
-                  <option>Marketing</option>
-                  <option>Finance</option>
-                  <option>Facilities</option>
+                  {departments.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
                 </select>
                 <svg className="h-4 w-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -487,7 +580,7 @@ export default function UserManagementPage() {
                       No users found.
                     </td>
                   </tr>
-                ) : filtered.map(user => {
+                ) : paginatedUsers.map(user => {
                   const userStatus = getUserStatus(user);
                   const st = STATUS_STYLE[userStatus];
                   const rl = ROLE_STYLE[user.role] || ROLE_STYLE.employee;
@@ -559,7 +652,7 @@ export default function UserManagementPage() {
                         </button>
                         {openMenu === user.id && (
                           <div className="absolute right-4 top-10 bg-white border border-gray-200 rounded-xl shadow-xl z-20 min-w-[160px] overflow-hidden select-none animate-fade-in text-xs font-bold text-slate-700">
-                            <button onClick={() => navigate(`/profile`)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition flex items-center gap-2">
+                            <button onClick={() => navigate(`/profile?user_id=${user.id}`)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition flex items-center gap-2">
                               <svg className="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -572,7 +665,18 @@ export default function UserManagementPage() {
                               </svg>
                               Change Role
                             </button>
-                            <button className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setMsgRecipient(user);
+                                setShowSendMsgModal(true);
+                                setMsgSubject("");
+                                setMsgBody("");
+                                setMsgError("");
+                                setMsgSuccess("");
+                                setOpenMenu(null);
+                              }}
+                              className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition flex items-center gap-2"
+                            >
                               <svg className="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                               </svg>
@@ -611,7 +715,7 @@ export default function UserManagementPage() {
             {/* Pagination footer */}
             <div className="flex items-center justify-between p-4 border-t border-gray-200 select-none flex-wrap gap-4">
               <span className="text-xs font-semibold text-slate-500">
-                Showing 1 to {Math.min(PAGE_SIZE, filtered.length)} of {stats.total} users
+                Showing {filtered.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + PAGE_SIZE, filtered.length)} of {filtered.length} users
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -622,8 +726,9 @@ export default function UserManagementPage() {
                   Previous
                 </button>
                 <button
+                  disabled={startIndex + PAGE_SIZE >= filtered.length}
                   onClick={() => setPage(p => p + 1)}
-                  className="px-3.5 py-1.5 bg-white border border-gray-300 hover:bg-slate-50 rounded-lg text-xs font-bold transition text-slate-700"
+                  className="px-3.5 py-1.5 bg-white border border-gray-300 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg text-xs font-bold transition text-slate-700"
                 >
                   Next
                 </button>
@@ -720,6 +825,164 @@ export default function UserManagementPage() {
                 className="bg-[#003399] hover:bg-[#124090] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded-xl text-xs font-bold transition shadow-sm"
               >
                 {inviting ? "Inviting..." : "Send Invite"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── AUDIT LOGS MODAL ── */}
+      {showAuditModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setShowAuditModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 select-none">
+              <h2 className="text-base md:text-lg font-black text-[#111827]">Email Audit Logs (Last 50 Logs)</h2>
+              <button onClick={() => setShowAuditModal(false)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#111827] transition-colors">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar text-left">
+              {loadingAudit ? (
+                <div className="flex items-center justify-center py-10 gap-2 text-slate-400">
+                  <div className="h-4 w-4 border-2 border-gray-300 border-t-[#003399] rounded-full animate-spin"></div>
+                  Loading audit logs...
+                </div>
+              ) : auditLogs.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 font-semibold">
+                  No email audit logs found.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-gray-200">
+                        <th className="p-3 font-bold text-slate-500 uppercase">Recipient</th>
+                        <th className="p-3 font-bold text-slate-500 uppercase">Subject</th>
+                        <th className="p-3 font-bold text-slate-500 uppercase">Template</th>
+                        <th className="p-3 font-bold text-slate-500 uppercase">Status</th>
+                        <th className="p-3 font-bold text-slate-500 uppercase">Sent At</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditLogs.map(log => (
+                        <tr key={log.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                          <td className="p-3 font-semibold text-slate-700">{log.recipient_email}</td>
+                          <td className="p-3 text-slate-600">{log.subject}</td>
+                          <td className="p-3 text-slate-500 font-mono">{log.template_name}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${log.status === "sent" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
+                              {log.status}
+                            </span>
+                            {log.error_message && (
+                              <p className="text-[10px] text-red-500 mt-1 max-w-xs truncate" title={log.error_message}>
+                                {log.error_message}
+                              </p>
+                            )}
+                          </td>
+                          <td className="p-3 text-slate-500">
+                            {log.sent_at ? new Date(log.sent_at).toLocaleString("id-ID") : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end">
+              <button
+                onClick={() => setShowAuditModal(false)}
+                className="bg-[#003399] hover:bg-[#124090] text-white px-5 py-2 rounded-xl text-xs font-bold transition shadow-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SEND MESSAGE MODAL ── */}
+      {showSendMsgModal && msgRecipient && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => { setShowSendMsgModal(false); setMsgRecipient(null); }}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 select-none">
+              <h2 className="text-base md:text-lg font-black text-[#111827]">Send Message to {msgRecipient.full_name}</h2>
+              <button onClick={() => { setShowSendMsgModal(false); setMsgRecipient(null); }} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#111827] transition-colors">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {msgError && (
+              <div className="mx-6 mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-xs font-bold text-red-600 flex items-center gap-1.5 select-none">
+                <svg className="h-4 w-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                {msgError}
+              </div>
+            )}
+
+            {msgSuccess && (
+              <div className="mx-6 mt-4 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 text-xs font-bold text-emerald-600 flex items-center gap-1.5 select-none">
+                <svg className="h-4 w-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {msgSuccess}
+              </div>
+            )}
+
+            <div className="p-6 space-y-4 text-left">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Recipient Email</label>
+                <input
+                  type="text"
+                  value={msgRecipient.email}
+                  disabled
+                  className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs md:text-sm text-slate-400 bg-slate-50 outline-none cursor-not-allowed"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Subject *</label>
+                <input
+                  type="text"
+                  value={msgSubject}
+                  onChange={e => setMsgSubject(e.target.value)}
+                  placeholder="Subject of the message"
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs md:text-sm text-slate-800 placeholder-gray-400 outline-none focus:border-[#003399] transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Content *</label>
+                <textarea
+                  value={msgBody}
+                  onChange={e => setMsgBody(e.target.value)}
+                  placeholder="Write your custom message here..."
+                  rows={5}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs md:text-sm text-slate-800 placeholder-gray-400 outline-none focus:border-[#003399] transition-all custom-scrollbar resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3 select-none">
+              <button
+                onClick={() => { setShowSendMsgModal(false); setMsgRecipient(null); }}
+                className="border border-gray-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendMessage}
+                disabled={sendingMsg}
+                className="bg-[#003399] hover:bg-[#124090] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded-xl text-xs font-bold transition shadow-sm"
+              >
+                {sendingMsg ? "Sending..." : "Send Message"}
               </button>
             </div>
           </div>

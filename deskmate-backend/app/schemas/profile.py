@@ -21,6 +21,7 @@ class ProfileBase(BaseModel):
     employee_id: str | None = Field(None, max_length=50)
     department: str | None = Field(None, max_length=100)
     avatar_url: str | None = None
+    phone: str | None = Field(None, max_length=50)
 
 
 # ── Request: Update profil ────────────────────────────────────────
@@ -29,6 +30,7 @@ class ProfileUpdate(BaseModel):
     full_name: str | None = Field(None, min_length=2, max_length=150)
     department: str | None = Field(None, max_length=100)
     avatar_url: str | None = None
+    phone: str | None = Field(None, max_length=50)
 
 
 # ── Request: Update oleh Admin ────────────────────────────────────
@@ -47,6 +49,7 @@ class ProfileResponse(ProfileBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    email: str | None = None
 
     model_config = {"from_attributes": True}  # Baca dari SQLAlchemy model
 

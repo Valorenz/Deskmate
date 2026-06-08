@@ -86,44 +86,99 @@ export default function SupervisorDashboardPage() {
     return true;
   });
 
-  // Mock trend data (7 days)
-  const trendData = [32, 45, 58, 62, 48, 35, 20];
-  const trendLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-  // Mock team data
-  const teamData = [
-    { name: "Mark Johnson", open: 12, resolved: 45, csat: "4.8/5", status: "Online", color: "#2563EB" },
-    { name: "Sarah Connor", open: 18, resolved: 38, csat: "4.9/5", status: "Busy",   color: "#7C3AED" },
-    { name: "James Wilson", open: 8,  resolved: 52, csat: "4.7/5", status: "Offline", color: "#059669" },
-  ];
-
-  const slaSegments = [
+  // Dynamic metrics & trends state
+  const [trendData, setTrendData] = useState([32, 45, 58, 62, 48, 35, 20]);
+  const [trendLabels, setTrendLabels] = useState(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+  const [teamData, setTeamData] = useState([]);
+  const [slaSegments, setSlaSegments] = useState([
     { value: 75, color: "#22C55E", label: "Met SLA" },
     { value: 15, color: "#F59E0B", label: "Near Breach" },
     { value: 10, color: "#EF4444", label: "Breached" },
-  ];
+  ]);
+
+  const [sendingReport, setSendingReport] = useState(null);
+  const [reportMessage, setReportMessage] = useState("");
+  const [reportError, setReportError] = useState("");
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const pr = await apiFetch("/api/v1/profiles/me");
+        if (pr?.ok) setProfile(await pr.json());
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadProfile();
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [deptFilter]);
+
+  async function handleSendReport(type) {
+    setSendingReport(type);
+    setReportMessage("");
+    setReportError("");
+    try {
+      const res = await apiFetch(`/api/v1/tickets/send-report?report_type=${type}`, {
+        method: "POST"
+      });
+      if (res?.ok) {
+        const data = await res.json();
+        setReportMessage(data.message || `Laporan ${type} berhasil dikirim!`);
+        setTimeout(() => setReportMessage(""), 5000);
+      } else {
+        const err = await res.json();
+        setReportError(err.detail || "Gagal mengirim laporan.");
+        setTimeout(() => setReportError(""), 7000);
+      }
+    } catch (e) {
+      console.error(e);
+      setReportError("Terjadi kesalahan koneksi saat mengirim laporan.");
+      setTimeout(() => setReportError(""), 7000);
+    } finally {
+      setSendingReport(null);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
     try {
-      const pr = await apiFetch("/api/v1/profiles/me");
-      if (pr?.ok) setProfile(await pr.json());
-
       const tr = await apiFetch("/api/v1/tickets/?size=100");
       if (tr?.ok) {
         const data = await tr.json();
         const items = data.items || [];
         setTickets(items.slice(0, 5));
+      }
+
+      const params = new URLSearchParams();
+      if (deptFilter !== "All Departments") {
+        params.append("department", deptFilter);
+      }
+      const sr = await apiFetch(`/api/v1/tickets/stats/supervisor?${params.toString()}`);
+      if (sr?.ok) {
+        const sData = await sr.json();
         setStats({
-          total: data.total || 0,
-          overdue: items.filter((t) => t.priority === "critical" || t.priority === "high").length,
-          unassigned: items.filter((t) => !t.assigned_to).length,
-          avgResponse: "1.4h",
+          total: sData.total_open ?? 0,
+          overdue: sData.overdue ?? 0,
+          unassigned: sData.unassigned ?? 0,
+          avgResponse: sData.avg_response_time ?? "1.4h",
         });
+        if (sData.trends) {
+          setTrendData(sData.trends.data || []);
+          setTrendLabels(sData.trends.labels || []);
+        }
+        if (sData.sla) {
+          setSlaSegments([
+            { value: sData.sla.met ?? 0, color: "#22C55E", label: "Met SLA" },
+            { value: sData.sla.near_breach ?? 0, color: "#F59E0B", label: "Near Breach" },
+            { value: sData.sla.breached ?? 0, color: "#EF4444", label: "Breached" },
+          ]);
+        }
+        if (sData.team_performance) {
+          setTeamData(sData.team_performance);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -342,18 +397,53 @@ export default function SupervisorDashboardPage() {
         <main className="flex-1 overflow-y-auto bg-[#f0f4f9] p-4 md:p-6 space-y-6">
           
           {/* Section Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <span className="text-[10px] font-extrabold text-[#124090] tracking-widest uppercase">Epson Management Hub</span>
               <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mt-1">Supervisor Dashboard</h2>
               <p className="text-xs text-[#6b7280] mt-0.5">Analisis performa penyelesaian SLA, beban kerja tim helpdesk IT, dan kelola eskalasi.</p>
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button 
+                onClick={() => handleSendReport("daily")} 
+                disabled={sendingReport !== null}
+                className="bg-white border border-[#d1d5db] hover:bg-gray-50 text-[#374151] text-xs font-bold px-3.5 py-2 rounded-xl transition duration-200 shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {sendingReport === "daily" ? "Mengirim Daily..." : "Kirim Daily Report"}
+              </button>
+              <button 
+                onClick={() => handleSendReport("weekly")} 
+                disabled={sendingReport !== null}
+                className="bg-white border border-[#d1d5db] hover:bg-gray-50 text-[#374151] text-xs font-bold px-3.5 py-2 rounded-xl transition duration-200 shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {sendingReport === "weekly" ? "Mengirim Weekly..." : "Kirim Weekly Report"}
+              </button>
               <button onClick={() => navigate("/all-tickets")} className="bg-[#124090] hover:bg-[#0e306e] text-white text-xs font-bold px-4 py-2 rounded-xl transition duration-200 shadow-sm border-none cursor-pointer">
                 + Semua Tiket Unit
               </button>
             </div>
           </div>
+
+          {/* Report Delivery Feedback Banners */}
+          {reportMessage && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-xs text-emerald-800 flex items-center justify-between shadow-sm animate-fade-in">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                <span className="font-semibold">{reportMessage}</span>
+              </div>
+              <button onClick={() => setReportMessage("")} className="text-emerald-500 hover:text-emerald-700 font-bold px-1 text-base cursor-pointer">×</button>
+            </div>
+          )}
+
+          {reportError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 text-xs text-red-800 flex items-center justify-between shadow-sm animate-fade-in">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                <span className="font-semibold">{reportError}</span>
+              </div>
+              <button onClick={() => setReportError("")} className="text-red-500 hover:text-red-700 font-bold px-1 text-base cursor-pointer">×</button>
+            </div>
+          )}
 
           <div className="flex flex-col gap-6">
             
@@ -450,8 +540,11 @@ export default function SupervisorDashboardPage() {
                   <div className="relative">
                     <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-[#374151] outline-none cursor-pointer pr-6 appearance-none">
                       <option>All Departments</option>
-                      <option>IT & Network</option>
-                      <option>HR</option>
+                      <option>IT Support</option>
+                      <option>Engineering</option>
+                      <option>Human Resources</option>
+                      <option>Marketing</option>
+                      <option>Finance</option>
                       <option>Facilities</option>
                     </select>
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-[#9ca3af] pointer-events-none">▼</span>
@@ -496,22 +589,30 @@ export default function SupervisorDashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {teamData.map((agent) => (
-                        <tr key={agent.name} className="hover:bg-slate-50/30 transition-colors">
-                          <td className="p-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-7 h-7 rounded-full text-white flex items-center justify-center font-bold text-xs shrink-0" style={{ background: agent.color }}>
-                                {agent.name.charAt(0)}
-                              </div>
-                              <span className="text-xs font-bold text-slate-800">{agent.name}</span>
-                            </div>
+                      {teamData.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="p-6 text-center text-xs text-[#6b7280]">
+                            {loading ? "Memuat data tim..." : "Tidak ada data tim helpdesk aktif."}
                           </td>
-                          <td className="p-3 text-xs text-slate-600 font-semibold">{agent.open}</td>
-                          <td className="p-3 text-xs text-slate-600 font-semibold">{agent.resolved}</td>
-                          <td className="p-3 text-xs text-slate-600 font-semibold">{agent.csat}</td>
-                          <td className="p-3">{statusBadge(agent.status)}</td>
                         </tr>
-                      ))}
+                      ) : (
+                        teamData.map((agent) => (
+                          <tr key={agent.name} className="hover:bg-slate-50/30 transition-colors">
+                            <td className="p-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-7 h-7 rounded-full text-white flex items-center justify-center font-bold text-xs shrink-0 font-sans" style={{ background: agent.color || "#2563EB" }}>
+                                  {(agent.name || "A").charAt(0).toUpperCase()}
+                                </div>
+                                <span className="text-xs font-bold text-slate-800">{agent.name || "Unknown Agent"}</span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-xs text-slate-600 font-semibold">{agent.open}</td>
+                            <td className="p-3 text-xs text-slate-600 font-semibold">{agent.resolved}</td>
+                            <td className="p-3 text-xs text-slate-600 font-semibold">{agent.csat || "4.8/5"}</td>
+                            <td className="p-3">{statusBadge(agent.status || "Online")}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -557,7 +658,7 @@ export default function SupervisorDashboardPage() {
 
                 <div className="p-4 bg-slate-50 border border-gray-100 rounded-xl mt-6">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">SLA Status Info</h4>
-                  <p className="text-[11px] text-[#6b7280] leading-relaxed mt-1">92% dari tiket terselesaikan dalam batas waktu SLA disepakati minggu ini.</p>
+                  <p className="text-[11px] text-[#6b7280] leading-relaxed mt-1">{(slaSegments && slaSegments[0]?.value) ?? 0}% dari tiket terselesaikan dalam batas waktu SLA disepakati minggu ini.</p>
                 </div>
               </div>
 

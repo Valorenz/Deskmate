@@ -26,6 +26,14 @@ async def lifespan(app: FastAPI):
     logger.info(f"   Version: {settings.APP_VERSION}")
     os.makedirs(settings.CHROMA_PERSIST_DIRECTORY, exist_ok=True)
     logger.info(f"   ChromaDB: {settings.CHROMA_PERSIST_DIRECTORY}")
+    
+    # Start report scheduler
+    try:
+        from app.services.scheduler import start_scheduler
+        start_scheduler()
+    except Exception as e:
+        logger.error(f"Gagal memulai scheduler email report: {e}")
+        
     yield
     logger.info("🛑 DeskMate Backend shutting down...")
 

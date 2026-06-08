@@ -50,6 +50,12 @@ export default function TicketDetailPage() {
     return true;
   });
 
+  // Dynamic states
+  const [staffMembers, setStaffMembers] = useState([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  const attachmentInputRef = useRef(null);
+
   useEffect(() => {
     loadProfile();
     loadTicket();
@@ -58,6 +64,65 @@ export default function TicketDetailPage() {
       return () => clearTimeout(timer);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (role === "supervisor" || role === "admin") {
+      loadStaffMembers();
+    }
+  }, [role]);
+
+  async function loadStaffMembers() {
+    try {
+      const res = await apiFetch("/api/v1/profiles/");
+      if (res?.ok) {
+        const all = await res.json();
+        const staff = all.filter(p => p.role === "admin" || p.role === "supervisor");
+        setStaffMembers(staff);
+      }
+    } catch (err) {
+      console.error("Gagal memuat staf:", err);
+    }
+  }
+
+  async function updateTicketField(field, value) {
+    try {
+      const res = await apiFetch(`/api/v1/tickets/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (res?.ok) {
+        loadTicket();
+      } else {
+        console.error(`Gagal memperbarui field ${field}`);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file || uploadingFile) return;
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiFetch(`/api/v1/tickets/${id}/attachments`, {
+        method: "POST",
+        body: formData,
+      });
+      if (res?.ok) {
+        loadTicket();
+      } else {
+        const errData = await res.json();
+        console.error("Gagal mengunggah lampiran:", errData?.detail || res.statusText);
+      }
+    } catch (err) {
+      console.error("Error mengunggah berkas:", err);
+    } finally {
+      setUploadingFile(false);
+    }
+  }
 
   async function loadProfile() {
     const res = await apiFetch("/api/v1/profiles/me");
@@ -554,11 +619,21 @@ export default function TicketDetailPage() {
                     </button>
 
                     <div className="grid grid-cols-2 gap-3">
-                      <button className="flex items-center justify-center gap-1.5 border border-gray-300 hover:bg-slate-50 py-2 rounded-xl text-xs font-bold text-slate-700 transition">
+                      <input
+                        type="file"
+                        ref={attachmentInputRef}
+                        onChange={handleFileUpload}
+                        style={{ display: "none" }}
+                      />
+                      <button
+                        onClick={() => attachmentInputRef.current?.click()}
+                        disabled={uploadingFile}
+                        className="flex items-center justify-center gap-1.5 border border-gray-300 hover:bg-slate-50 py-2 rounded-xl text-xs font-bold text-slate-700 transition disabled:opacity-50"
+                      >
                         <svg className="h-4 w-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                         </svg>
-                        Attach
+                        {uploadingFile ? "Attaching..." : "Attach"}
                       </button>
                       <button
                         onClick={escalateTicket}
@@ -570,6 +645,24 @@ export default function TicketDetailPage() {
                         Escalate
                       </button>
                     </div>
+
+                    {(role === "supervisor" || role === "admin") && ticket.assigned_to !== profile?.id && (
+                      <button
+                        onClick={() => updateTicketField("assigned_to", profile.id)}
+                        className="w-full border border-[#003399] hover:bg-blue-50 text-[#003399] py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                      >
+                        Assign to Me
+                      </button>
+                    )}
+
+                    {ticket.status !== "closed" && (
+                      <button
+                        onClick={() => updateTicketField("status", "closed")}
+                        className="w-full bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                      >
+                        Close Ticket
+                      </button>
+                    )}
 
                     {/* New Comment Text Box */}
                     <div className="border border-gray-200/80 rounded-xl p-3 bg-slate-50/50 space-y-3">
@@ -615,31 +708,76 @@ export default function TicketDetailPage() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between py-1 border-b border-slate-100">
                         <span className="text-xs font-semibold text-slate-500">Assignee</span>
-                        <select className="border border-gray-200 rounded-lg p-1 text-xs text-slate-800 bg-white font-semibold outline-none cursor-pointer">
-                          <option value="">{ticket.assignee?.full_name || "Unassigned"}</option>
-                        </select>
+                        {role === "admin" || role === "supervisor" ? (
+                          <select
+                            value={ticket.assigned_to || ""}
+                            onChange={(e) => updateTicketField("assigned_to", e.target.value || null)}
+                            className="border border-gray-200 rounded-lg p-1 text-xs text-slate-800 bg-white font-semibold outline-none cursor-pointer max-w-[150px]"
+                          >
+                            <option value="">Unassigned</option>
+                            {staffMembers.map(m => (
+                              <option key={m.id} value={m.id}>{m.full_name}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700">{ticket.assignee?.full_name || "Unassigned"}</span>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between py-1 border-b border-slate-100">
                         <span className="text-xs font-semibold text-slate-500">Category</span>
-                        <select className="border border-gray-200 rounded-lg p-1 text-xs text-slate-800 bg-white font-semibold outline-none cursor-pointer">
-                          <option>{ticket.category || "Uncategorized"}</option>
-                        </select>
+                        {role === "admin" || role === "supervisor" ? (
+                          <select
+                            value={ticket.category || ""}
+                            onChange={(e) => updateTicketField("category", e.target.value || null)}
+                            className="border border-gray-200 rounded-lg p-1 text-xs text-slate-800 bg-white font-semibold outline-none cursor-pointer max-w-[150px]"
+                          >
+                            <option value="IT Support">IT Support</option>
+                            <option value="Engineering">Engineering</option>
+                            <option value="Human Resources">Human Resources</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Facilities">Facilities</option>
+                            <option value="General">General</option>
+                          </select>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700">{ticket.category || "General"}</span>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between py-1 border-b border-slate-100">
                         <span className="text-xs font-semibold text-slate-500">Priority</span>
-                        <span className="text-xs font-bold flex items-center gap-1" style={{ color: pr.color }}>
-                          <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: pr.dot }} />
-                          {ticket.priority ? ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1) : "Medium"}
-                        </span>
+                        {role === "admin" || role === "supervisor" ? (
+                          <select
+                            value={ticket.priority || "medium"}
+                            onChange={(e) => updateTicketField("priority", e.target.value)}
+                            className="border border-gray-200 rounded-lg p-1 text-xs text-slate-800 bg-white font-semibold outline-none cursor-pointer"
+                          >
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                          </select>
+                        ) : (
+                          <span className="text-xs font-bold flex items-center gap-1" style={{ color: pr.color }}>
+                            <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: pr.dot }} />
+                            {ticket.priority ? ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1) : "Medium"}
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between py-1">
                         <span className="text-xs font-semibold text-slate-500">Status</span>
-                        <span className="text-[10px] md:text-xs font-extrabold px-2 py-0.5 rounded-full" style={{ background: st.bg, color: st.color }}>
-                          {st.label}
-                        </span>
+                        <select
+                          value={ticket.status}
+                          onChange={(e) => updateTicketField("status", e.target.value)}
+                          className="border border-gray-200 rounded-lg p-1 text-xs text-slate-800 bg-white font-semibold outline-none cursor-pointer"
+                        >
+                          <option value="open">Open</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="resolved">Resolved</option>
+                          <option value="closed">Closed</option>
+                        </select>
                       </div>
                     </div>
                   </div>

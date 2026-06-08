@@ -59,13 +59,13 @@ class VectorService:
         # Model ini sama yang dipakai saat indexing DAN saat query,
         # agar hasil pencarian konsisten
         self._embedding_model = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004",
+            model="models/gemini-embedding-001",
             google_api_key=settings.GEMINI_API_KEY,
             task_type="retrieval_document",  # Optimized untuk dokumen panjang
         )
 
         self._query_embedding_model = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004",
+            model="models/gemini-embedding-001",
             google_api_key=settings.GEMINI_API_KEY,
             task_type="retrieval_query",     # Optimized untuk query pendek
         )

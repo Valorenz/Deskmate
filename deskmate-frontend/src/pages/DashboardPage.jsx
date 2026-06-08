@@ -37,17 +37,18 @@ export default function DashboardPage() {
         setProfile(p);
       }
 
+      // Ambil stats riil
+      const statsRes = await apiFetch("/api/v1/tickets/stats/employee");
+      if (statsRes?.ok) {
+        setStats(await statsRes.json());
+      }
+
       // Ambil tiket
       const ticketRes = await apiFetch("/api/v1/tickets/?size=5");
       if (ticketRes?.ok) {
         const data = await ticketRes.json();
         const items = data.items || [];
         setTickets(items);
-        setStats({
-          open: items.filter((t) => t.status === "open").length,
-          awaiting: items.filter((t) => t.status === "in_progress").length,
-          resolved: items.filter((t) => t.status === "resolved" || t.status === "closed").length,
-        });
       }
     } catch (e) {
       console.error(e);

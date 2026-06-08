@@ -106,6 +106,39 @@ export default function AllTicketsPage() {
     } finally { setLoading(false); }
   }
 
+  async function handleAssignToMe(ticketId) {
+    if (!profile?.id) return;
+    try {
+      const r = await apiFetch(`/api/v1/tickets/${ticketId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ assigned_to: profile.id }),
+      });
+      if (r?.ok) {
+        loadTickets();
+      } else {
+        console.error("Gagal melakukan assign tiket.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleCloseTicket(ticketId) {
+    try {
+      const r = await apiFetch(`/api/v1/tickets/${ticketId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "closed" }),
+      });
+      if (r?.ok) {
+        loadTickets();
+      } else {
+        console.error("Gagal menutup tiket.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   const filtered = tickets.filter(t =>
     !search ||
     t.title?.toLowerCase().includes(search.toLowerCase()) ||
@@ -493,10 +526,10 @@ export default function AllTicketsPage() {
                           <td className="p-3.5 relative" onClick={e => { e.stopPropagation(); setOpenMenu(openMenu === ticket.id ? null : ticket.id); }}>
                             <button className="text-gray-400 hover:text-slate-800 transition font-bold p-1">⋮</button>
                             {openMenu === ticket.id && (
-                              <div ref={menuRef} className="absolute right-2.5 top-9 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 w-40 z-50 text-left">
-                                <button onClick={() => navigate(`/tickets/${ticket.id}`)} className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 border-none bg-transparent cursor-pointer">View Details</button>
-                                <button className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 border-none bg-transparent cursor-pointer">Assign to Me</button>
-                                <button className="w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 border-t border-gray-100 border-none bg-transparent cursor-pointer">Close Ticket</button>
+                              <div ref={menuRef} className="absolute right-2.5 top-9 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 w-40 z-50 text-left" onClick={e => e.stopPropagation()}>
+                                <button onClick={(e) => { e.stopPropagation(); navigate(`/tickets/${ticket.id}`); }} className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 border-none bg-transparent cursor-pointer">View Details</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleAssignToMe(ticket.id); setOpenMenu(null); }} className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 border-none bg-transparent cursor-pointer">Assign to Me</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleCloseTicket(ticket.id); setOpenMenu(null); }} className="w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 border-t border-gray-100 border-none bg-transparent cursor-pointer">Close Ticket</button>
                               </div>
                             )}
                           </td>
