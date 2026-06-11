@@ -7,6 +7,8 @@ import { logout, getAvatarUrl } from '../utils/auth';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 // Utility to format markdown and custom safety/danger tags into rich, high-end HTML layouts
 function formatMessageContent(text) {
   if (!text) return "";
@@ -184,7 +186,7 @@ export default function ChatPage() {
 
     try {
       // 1. Fetch Sesi Percakapan
-      const sessionRes = await fetch('http://localhost:8000/api/v1/chat/sessions', {
+      const sessionRes = await fetch(`${API_URL}/api/v1/chat/sessions`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (sessionRes.ok) {
@@ -193,7 +195,7 @@ export default function ChatPage() {
       }
 
       // 2. Fetch Tiket Aktif
-      const ticketRes = await fetch('http://localhost:8000/api/v1/tickets/?status=open&size=5', {
+      const ticketRes = await fetch(`${API_URL}/api/v1/tickets/?status=open&size=5`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (ticketRes.ok) {
@@ -275,7 +277,7 @@ export default function ChatPage() {
     if (!confirm("Apakah Tuan Muda yakin ingin menghapus riwayat percakapan ini?")) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/chat/sessions/${id}`, {
+      const res = await fetch(`${API_URL}/api/v1/chat/sessions/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -325,7 +327,7 @@ export default function ChatPage() {
     handleRemoveImage();
 
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/chat/sessions/${id}/messages`, {
+      const res = await fetch(`${API_URL}/api/v1/chat/sessions/${id}/messages`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -373,7 +375,7 @@ export default function ChatPage() {
       let currentSessionId = sessionId;
 
       if (!currentSessionId) {
-        const sessionRes = await fetch('http://localhost:8000/api/v1/chat/sessions', {
+        const sessionRes = await fetch(`${API_URL}/api/v1/chat/sessions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -392,7 +394,7 @@ export default function ChatPage() {
       const formData = new FormData();
       formData.append('content', userText);
 
-      let targetUrl = `http://localhost:8000/api/v1/chat/sessions/${currentSessionId}/messages`;
+      let targetUrl = `${API_URL}/api/v1/chat/sessions/${currentSessionId}/messages`;
 
       if (selectedImage) {
         formData.append('image', selectedImage);
