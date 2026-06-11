@@ -1,0 +1,33 @@
+# Root .gitignore for DeskMate Project
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Node modules & frontend builds
+node_modules/
+dist/
+.vite/
+
+# Database files
+chroma_db/
+*.db
+
+# Secrets & Environment variables
+.env
+.env.local
+.env.*
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+conv_preview.txt
+extract_conv.py

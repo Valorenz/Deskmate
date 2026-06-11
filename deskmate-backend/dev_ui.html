@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeskMate — Dev Console</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:        #0d0f14;
+    --bg2:       #13161e;
+    --bg3:       #1a1e29;
+    --border:    #252a38;
+    --accent:    #4f9cf9;
+    --accent2:   #7c5cbf;
+    --green:     #3ecf8e;
+    --red:       #f96060;
+    --yellow:    #f9c74f;
+    --text:      #c9d1e0;
+    --text-dim:  #5a6478;
+    --text-bright: #eef2ff;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    grid-template-rows: 48px 1fr;
+  }
+
+  /* ── Topbar ── */
+  .topbar {
+    grid-column: 1 / -1;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 12px;
+  }
+  .topbar-logo {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  .topbar-logo span { color: var(--text-dim); }
+  .topbar-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--accent2);
+    color: #fff;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+  .topbar-url {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .topbar-url label { color: var(--text-dim); font-size: 12px; font-family: var(--mono); }
+  .topbar-url input {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 10px;
+    width: 220px;
+    outline: none;
+  }
+  .topbar-url input:focus { border-color: var(--accent); }
+  #status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s;
+  }
+  #status-dot.ok  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  #status-dot.err { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+    overflow-y: auto;
+  }
+  .sidebar-section {
+    padding: 0 16px;
+    margin-bottom: 20px;
+  }
+  .sidebar-section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+    padding-left: 4px;
+  }
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+    margin-bottom: 2px;
+  }
+  .nav-btn:hover { background: var(--bg3); }
+  .nav-btn.active { background: var(--bg3); color: var(--accent); }
+  .nav-btn .icon { font-size: 16px; width: 20px; text-align: center; }
+  .nav-badge {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text-dim);
+  }
+
+  /* ── Main content ── */
+  .main {
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg3);
+  }
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-bright);
+    font-weight: 500;
+  }
+  .panel-method {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .method-post { background: #1a3a2a; color: var(--green); }
+  .method-get  { background: #1a2d4a; color: var(--accent); }
+  .panel-body  { padding: 18px; }
+
+  /* ── Form elements ── */
+  .form-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; }
+  .form-group label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  .form-group input:focus,
+  .form-group textarea:focus,
+  .form-group select:focus { border-color: var(--accent); }
+  .form-group textarea { resize: vertical; min-height: 70px; }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 18px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.3px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0d0f14;
+  }
+  .btn-primary:hover { background: #74b2ff; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost {
+    background: var(--bg3);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: #3a1a1a; color: var(--red); border: 1px solid #3a1a1a; }
+  .btn-danger:hover { border-color: var(--red); }
+
+  /* ── Response viewer ── */
+  .response-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    margin-top: 14px;
+    position: relative;
+  }
+  .response-box pre {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .response-status {
+    position: absolute;
+    top: 10px; right: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+  }
+  .status-2xx { background: #1a3a2a; color: var(--green); }
+  .status-4xx { background: #3a1a1a; color: var(--red); }
+  .status-5xx { background: #3a1a1a; color: var(--red); }
+
+  /* ── Chat UI ── */
+  .chat-window {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    height: 360px;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 12px;
+    scroll-behavior: smooth;
+  }
+  .chat-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    gap: 8px;
+  }
+  .chat-empty .icon { font-size: 32px; opacity: 0.3; }
+  .msg {
+    display: flex;
+    gap: 10px;
+    animation: fadeUp 0.2s ease;
+  }
+  .msg.user { flex-direction: row-reverse; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .msg-avatar {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .msg.user .msg-avatar   { background: #1a2d4a; }
+  .msg.assistant .msg-avatar { background: #1a2a3a; }
+  .msg-bubble {
+    max-width: 75%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .msg.user .msg-bubble {
+    background: #1a2d4a;
+    color: var(--text-bright);
+    border-top-right-radius: 2px;
+  }
+  .msg.assistant .msg-bubble {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-top-left-radius: 2px;
+  }
+  .msg-sources {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+  .msg-sources span { color: var(--accent); }
+
+  .chat-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .chat-input-row textarea {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 10px 14px;
+    resize: none;
+    outline: none;
+    line-height: 1.5;
+    min-height: 42px;
+    max-height: 120px;
+  }
+  .chat-input-row textarea:focus { border-color: var(--accent); }
+
+  /* ── Token display ── */
+  .info-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 4px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .chip span { color: var(--text-bright); }
+
+  /* ── Loading spinner ── */
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Tab system ── */
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+  }
+  .tab {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 10px 18px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover  { color: var(--text); }
+  .tab-content { padding: 18px; display: none; }
+  .tab-content.active { display: block; }
+
+  .hidden { display: none !important; }
+  .divider { height: 1px; background: var(--border); margin: 14px 0; }
+
+  /* ── Token info ── */
+  #chat-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 16px;
+  }
+  #chat-meta span { color: var(--yellow); }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-logo">DeskMate<span>/</span>dev</div>
+  <div class="topbar-tag">DEV CONSOLE</div>
+  <div class="topbar-url">
+    <label>API_URL</label>
+    <input type="text" id="api-url" value="http://localhost:8000">
+    <div id="status-dot" title="Server status"></div>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">System</div>
+    <button class="nav-btn active" onclick="showPage('page-health')" id="nav-health">
+      <span class="icon">💚</span> Health Check
+    </button>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Auth</div>
+    <button class="nav-btn" onclick="showPage('page-auth')" id="nav-auth">
+      <span class="icon">🔐</span> Login & Token
+    </button>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Chat (RAG)</div>
+    <button class="nav-btn" onclick="showPage('page-chat')" id="nav-chat">
+      <span class="icon">🤖</span> Chat dengan AI
+    </button>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Documents</div>
+    <button class="nav-btn" onclick="showPage('page-docs')" id="nav-docs">
+      <span class="icon">📄</span> Upload Dokumen
+    </button>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Tickets</div>
+    <button class="nav-btn" onclick="showPage('page-tickets')" id="nav-tickets">
+      <span class="icon">🎫</span> Buat Tiket
+    </button>
+    <button class="nav-btn" onclick="showPage('page-tickets-list')" id="nav-tickets-list">
+      <span class="icon">📋</span> List Tiket
+    </button>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Profile</div>
+    <button class="nav-btn" onclick="showPage('page-profile')" id="nav-profile">
+      <span class="icon">👤</span> My Profile
+    </button>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- ── PAGE: HEALTH ── -->
+  <div id="page-health">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-method method-get">GET</span>
+        <span class="panel-title">/health</span>
+      </div>
+      <div class="panel-body">
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px;">
+          Test koneksi ke backend. Tidak memerlukan token JWT.
+        </p>
+        <button class="btn btn-primary" onclick="checkHealth()">▶ Run Health Check</button>
+        <div id="health-response" class="response-box hidden"><pre></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE: AUTH ── -->
+  <div id="page-auth" class="hidden">
+    <!-- Login Form -->
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-header">
+        <span class="panel-method method-post">POST</span>
+        <span class="panel-title">/api/v1/auth/login</span>
+      </div>
+      <div class="panel-body">
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px;">
+          Login dengan email & password. Token akan otomatis tersimpan setelah berhasil.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="login-email" placeholder="kamu@email.com">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="login-password" placeholder="password kamu">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="doLogin()">🔐 Login</button>
+        <div id="login-response" class="response-box hidden"><pre></pre></div>
+      </div>
+    </div>
+
+    <!-- Register Form -->
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-header">
+        <span class="panel-method method-post">POST</span>
+        <span class="panel-title">/api/v1/auth/register</span>
+      </div>
+      <div class="panel-body">
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px;">
+          Buat akun baru langsung dari sini.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nama Lengkap</label>
+            <input type="text" id="reg-name" placeholder="Budi Santoso">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="reg-email" placeholder="kamu@email.com">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="reg-password" placeholder="min. 6 karakter">
+          </div>
+        </div>
+        <button class="btn btn-ghost" onclick="doRegister()">📝 Register</button>
+        <div id="register-response" class="response-box hidden"><pre></pre></div>
+      </div>
+    </div>
+
+    <!-- Token Status -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">🎫 Status Token</span>
+      </div>
+      <div class="panel-body">
+        <div id="token-status" style="font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-bottom:12px;">
+          Belum ada token tersimpan.
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" onclick="testToken()">▶ Test Token (/api/v1/me)</button>
+          <button class="btn btn-danger" onclick="clearToken()">🗑 Hapus Token</button>
+        </div>
+        <div id="auth-response" class="response-box hidden"><pre></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE: CHAT ── -->
+  <div id="page-chat" class="hidden">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-method method-post">POST</span>
+        <span class="panel-title">/api/v1/chat/sessions/{id}/messages — RAG Chat</span>
+      </div>
+      <div class="panel-body">
+
+        <div class="tab-bar">
+          <button class="tab active" onclick="switchTab(this,'tab-chat-ui')">💬 Chat UI</button>
+          <button class="tab" onclick="switchTab(this,'tab-chat-session')">⚙ Session</button>
+        </div>
+
+        <div id="tab-chat-ui" class="tab-content active">
+          <div class="form-row" style="margin-bottom:10px;">
+            <div class="form-group" style="flex:none;min-width:0;">
+              <label>Session ID</label>
+              <input type="text" id="chat-session-id" placeholder="Buat sesi dulu di tab Session" style="width:320px;">
+            </div>
+          </div>
+          <div class="chat-window" id="chat-window">
+            <div class="chat-empty">
+              <div class="icon">🤖</div>
+              <div>Buat sesi chat & kirim pesan pertama</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div id="chat-meta">
+              Tokens: <span id="total-tokens">0</span> &nbsp;|&nbsp;
+              Latency: <span id="last-latency">—</span>
+            </div>
+            <button class="btn btn-ghost" onclick="clearChat()" style="font-size:11px;padding:4px 10px;">Clear UI</button>
+          </div>
+          <div class="chat-input-row">
+            <textarea id="chat-input" placeholder="Tanya sesuatu tentang SOP atau mesin... (Enter = kirim, Shift+Enter = baris baru)" rows="1"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}
+                         this.style.height='auto';this.style.height=this.scrollHeight+'px';"></textarea>
+            <button class="btn btn-primary" onclick="sendChatMessage()" id="send-btn">Kirim</button>
+          </div>
+        </div>
+
+        <div id="tab-chat-session" class="tab-content">
+          <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px;">
+            Buat sesi chat baru atau ambil daftar sesi yang ada.
+          </p>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Judul Sesi (opsional)</label>
+              <input type="text" id="session-title" placeholder="Biarkan kosong untuk auto-generate">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:14px;">
+            <button class="btn btn-primary" onclick="createSession()">➕ Buat Sesi Baru</button>
+            <button class="btn btn-ghost" onclick="listSessions()">📋 List Sesi Saya</button>
+          </div>
+          <div id="session-response" class="response-box hidden"><pre></pre></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE: DOCUMENTS ── -->
+  <div id="page-docs" class="hidden">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-method method-post">POST</span>
+        <span class="panel-title">/api/v1/documents/upload — Admin Only</span>
+      </div>
+      <div class="panel-body">
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px;">
+          Upload dokumen SOP/FAQ (PDF atau TXT). Indexing ke ChromaDB berjalan di background.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Judul Dokumen</label>
+            <input type="text" id="doc-title" placeholder="SOP Pengoperasian Mesin A3">
+          </div>
+          <div class="form-group">
+            <label>Kategori</label>
+            <select id="doc-category">
+              <option value="SOP">SOP</option>
+              <option value="FAQ">FAQ</option>
+              <option value="Manual">Manual</option>
+              <option value="Safety">Safety</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Deskripsi</label>
+            <input type="text" id="doc-description" placeholder="Deskripsi singkat isi dokumen">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>File (PDF / TXT)</label>
+            <input type="file" id="doc-file" accept=".pdf,.txt,.md" style="font-family:var(--sans);padding:6px 0;">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="uploadDocument()">📤 Upload & Index</button>
+        <div id="doc-response" class="response-box hidden"><pre></pre></div>
+        <div class="divider"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--text-dim);">Dokumen Tersedia</span>
+          <button class="btn btn-ghost" onclick="listDocuments()" style="font-size:11px;padding:5px 12px;">🔄 Refresh</button>
+        </div>
+        <div id="doc-list" style="font-family:var(--mono);font-size:12px;color:var(--text-dim);">
+          Klik Refresh untuk memuat daftar dokumen.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE: CREATE TICKET ── -->
+  <div id="page-tickets" class="hidden">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-method method-post">POST</span>
+        <span class="panel-title">/api/v1/tickets/</span>
+      </div>
+      <div class="panel-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Judul Masalah</label>
+            <input type="text" id="ticket-title" placeholder="Mesin A3 tidak mau menyala">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Deskripsi Detail</label>
+            <textarea id="ticket-desc" placeholder="Jelaskan masalah secara detail..."></textarea>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Kategori</label>
+            <select id="ticket-category">
+              <option>Mesin</option>
+              <option>Software</option>
+              <option>Prosedur</option>
+              <option>Keselamatan</option>
+              <option>Lainnya</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Prioritas</label>
+            <select id="ticket-priority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="createTicket()">🎫 Buat Tiket</button>
+        <div id="ticket-response" class="response-box hidden"><pre></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE: LIST TICKETS ── -->
+  <div id="page-tickets-list" class="hidden">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-method method-get">GET</span>
+        <span class="panel-title">/api/v1/tickets/ — List & Filter</span>
+      </div>
+      <div class="panel-body">
+        <div class="form-row" style="align-items:flex-end;">
+          <div class="form-group" style="flex:none;">
+            <label>Filter Status</label>
+            <select id="filter-status">
+              <option value="">Semua</option>
+              <option value="open">Open</option>
+              <option value="in_progress">In Progress</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:none;">
+            <label>Filter Prioritas</label>
+            <select id="filter-priority">
+              <option value="">Semua</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="listTickets()" style="margin-bottom:0;align-self:flex-end;">🔍 Cari</button>
+        </div>
+        <div id="ticket-list-response" class="response-box hidden"><pre></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE: PROFILE ── -->
+  <div id="page-profile" class="hidden">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-method method-get">GET</span>
+        <span class="panel-title">/api/v1/profiles/me</span>
+      </div>
+      <div class="panel-body">
+        <button class="btn btn-primary" onclick="getMyProfile()">▶ Ambil Profil Saya</button>
+        <div id="profile-response" class="response-box hidden"><pre></pre></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let jwtToken = localStorage.getItem('dm_jwt') || '';
+let currentSessionId = '';
+let totalTokens = 0;
+
+// ── Init ──────────────────────────────────────────────────────────
+window.onload = () => {
+  updateTokenStatus();
+  checkHealth();
+};
+
+// ── Navigation ────────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.main > div').forEach(el => el.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const navId = 'nav-' + id.replace('page-','').replace('-list','').replace('-list','');
+  const navEl = document.getElementById(navId) || document.getElementById('nav-' + id.replace('page-',''));
+  if (navEl) navEl.classList.add('active');
+}
+
+function switchTab(btn, tabId) {
+  const panel = btn.closest('.panel');
+  panel.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  panel.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+// ── API helpers ──────────────────────────────────────────────────
+function getBase() { return document.getElementById('api-url').value.replace(/\/$/,''); }
+
+function getHeaders(contentType = 'application/json') {
+  const h = {};
+  if (contentType) h['Content-Type'] = contentType;
+  if (jwtToken) h['Authorization'] = `Bearer ${jwtToken}`;
+  return h;
+}
+
+function showResponse(elId, status, data) {
+  const box = document.getElementById(elId);
+  box.classList.remove('hidden');
+  const statusClass = status >= 500 ? 'status-5xx' : status >= 400 ? 'status-4xx' : 'status-2xx';
+  box.innerHTML = `
+    <div class="response-status ${statusClass}">${status}</div>
+    <pre>${JSON.stringify(data, null, 2)}</pre>
+  `;
+}
+
+async function apiFetch(method, path, body = null, isForm = false) {
+  try {
+    const opts = { method, headers: isForm ? { Authorization: `Bearer ${jwtToken}` } : getHeaders() };
+    if (body) opts.body = isForm ? body : JSON.stringify(body);
+    const res = await fetch(getBase() + path, opts);
+    const data = await res.json().catch(() => ({}));
+    return { status: res.status, data };
+  } catch(e) {
+    return { status: 0, data: { error: e.message } };
+  }
+}
+
+// ── Health ────────────────────────────────────────────────────────
+async function checkHealth() {
+  const dot = document.getElementById('status-dot');
+  const { status, data } = await apiFetch('GET', '/health');
+  dot.className = status === 200 ? 'ok' : 'err';
+  showResponse('health-response', status, data);
+}
+
+// ── Auth ──────────────────────────────────────────────────────────
+function updateTokenStatus() {
+  const el = document.getElementById('token-status');
+  if (!el) return;
+  if (jwtToken) {
+    // Decode payload untuk tampilkan info
+    try {
+      const payload = JSON.parse(atob(jwtToken.split('.')[1]));
+      const exp = payload.exp ? new Date(payload.exp * 1000).toLocaleString('id-ID') : 'Unknown';
+      const email = payload.email || '-';
+      const role = payload.role || '-';
+      el.innerHTML = `<span style="color:var(--green);">✅ Token aktif</span><br>
+        Email: <span style="color:var(--text-bright);">${email}</span><br>
+        Role: <span style="color:var(--accent);">${role}</span><br>
+        Expired: <span style="color:var(--yellow);">${exp}</span>`;
+    } catch(e) {
+      el.innerHTML = '<span style="color:var(--green);">✅ Token tersimpan</span>';
+    }
+  } else {
+    el.innerHTML = '<span style="color:var(--text-dim);">Belum ada token tersimpan.</span>';
+  }
+}
+
+async function doLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value.trim();
+  if (!email || !password) { alert('Email dan password wajib diisi.'); return; }
+
+  const { status, data } = await apiFetch('POST', '/api/v1/auth/login', { email, password });
+  if (status === 200 && data.access_token) {
+    jwtToken = data.access_token;
+    localStorage.setItem('dm_jwt', jwtToken);
+    updateTokenStatus();
+    showResponse('login-response', status, {
+      message: '✅ Login berhasil! Token otomatis tersimpan.',
+      email: data.email,
+      user_id: data.user_id,
+      expires_in: data.expires_in + ' detik',
+      access_token: data.access_token.substring(0, 40) + '...',
+    });
+  } else {
+    showResponse('login-response', status, data);
+  }
+}
+
+async function doRegister() {
+  const full_name = document.getElementById('reg-name').value.trim();
+  const email     = document.getElementById('reg-email').value.trim();
+  const password  = document.getElementById('reg-password').value.trim();
+  if (!full_name || !email || !password) { alert('Semua field wajib diisi.'); return; }
+
+  const { status, data } = await apiFetch('POST', '/api/v1/auth/register', { email, password, full_name });
+  showResponse('register-response', status, data);
+  if (status === 201) {
+    showResponse('register-response', status, {
+      ...data,
+      _tip: 'Sekarang login dengan akun yang baru dibuat.'
+    });
+  }
+}
+
+function saveToken() {
+  const input = document.getElementById('jwt-input');
+  if (input) jwtToken = input.value.trim();
+  localStorage.setItem('dm_jwt', jwtToken);
+  updateTokenStatus();
+  showResponse('auth-response', 200, { message: 'Token disimpan.' });
+}
+
+function clearToken() {
+  jwtToken = '';
+  localStorage.removeItem('dm_jwt');
+  updateTokenStatus();
+  showResponse('auth-response', 200, { message: 'Token dihapus. Silakan login ulang.' });
+}
+
+async function testToken() {
+  const { status, data } = await apiFetch('GET', '/api/v1/me');
+  showResponse('auth-response', status, data);
+}
+
+// ── Chat ──────────────────────────────────────────────────────────
+async function createSession() {
+  const title = document.getElementById('session-title').value.trim() || null;
+  const { status, data } = await apiFetch('POST', '/api/v1/chat/sessions', { title });
+  showResponse('session-response', status, data);
+  if (status === 201 && data.id) {
+    currentSessionId = data.id;
+    document.getElementById('chat-session-id').value = data.id;
+    showResponse('session-response', status, { ...data, _note: 'Session ID sudah diisi otomatis di tab Chat UI!' });
+  }
+}
+
+async function listSessions() {
+  const { status, data } = await apiFetch('GET', '/api/v1/chat/sessions');
+  showResponse('session-response', status, data);
+}
+
+function appendMsg(role, content, sources = [], tokens = null, latency = null) {
+  const win = document.getElementById('chat-window');
+  // Hapus empty state
+  const empty = win.querySelector('.chat-empty');
+  if (empty) empty.remove();
+
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const avatar = role === 'user' ? '👤' : '🤖';
+  let sourcesHtml = '';
+  if (sources && sources.length > 0) {
+    sourcesHtml = `<div class="msg-sources">📎 Sumber: ${sources.map(s => `<span>${s.title}</span> (score: ${(s.score*100).toFixed(0)}%)`).join(', ')}</div>`;
+  }
+  let metaHtml = '';
+  if (tokens || latency) {
+    metaHtml = `<div style="font-size:10px;color:var(--text-dim);font-family:var(--mono);margin-top:5px;">${tokens ? `${tokens} tokens` : ''} ${latency ? `· ${latency}ms` : ''}</div>`;
+  }
+  div.innerHTML = `
+    <div class="msg-avatar">${avatar}</div>
+    <div class="msg-bubble">${content}${sourcesHtml}${metaHtml}</div>
+  `;
+  win.appendChild(div);
+  win.scrollTop = win.scrollHeight;
+}
+
+function appendTyping() {
+  const win = document.getElementById('chat-window');
+  const div = document.createElement('div');
+  div.className = 'msg assistant';
+  div.id = 'typing-indicator';
+  div.innerHTML = `
+    <div class="msg-avatar">🤖</div>
+    <div class="msg-bubble" style="color:var(--text-dim);">
+      <span class="spinner"></span>DeskMate sedang berpikir...
+    </div>
+  `;
+  win.appendChild(div);
+  win.scrollTop = win.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typing-indicator');
+  if (el) el.remove();
+}
+
+async function sendChatMessage() {
+  const sessionId = document.getElementById('chat-session-id').value.trim();
+  const content = document.getElementById('chat-input').value.trim();
+  if (!sessionId || !content) {
+    alert('Isi Session ID dan pesan terlebih dahulu.');
+    return;
+  }
+  document.getElementById('chat-input').value = '';
+  document.getElementById('chat-input').style.height = 'auto';
+  document.getElementById('send-btn').disabled = true;
+
+  appendMsg('user', content);
+  appendTyping();
+
+  const form = new FormData();
+  form.append('content', content);
+  form.append('attachment_ids', '[]');
+
+  const { status, data } = await apiFetch('POST', `/api/v1/chat/sessions/${sessionId}/messages`, form, true);
+  removeTyping();
+  document.getElementById('send-btn').disabled = false;
+
+  if (status === 200 && data.ai_message) {
+    appendMsg('assistant', data.ai_message.content, data.ai_message.source_documents,
+      data.ai_message.tokens_used, data.ai_message.latency_ms);
+    totalTokens += (data.ai_message.tokens_used || 0);
+    document.getElementById('total-tokens').textContent = totalTokens;
+    document.getElementById('last-latency').textContent = data.ai_message.latency_ms ? `${data.ai_message.latency_ms}ms` : '—';
+  } else {
+    appendMsg('assistant', `❌ Error ${status}: ${data.detail || JSON.stringify(data)}`);
+  }
+}
+
+function clearChat() {
+  const win = document.getElementById('chat-window');
+  win.innerHTML = `<div class="chat-empty"><div class="icon">🤖</div><div>Chat cleared</div></div>`;
+  totalTokens = 0;
+  document.getElementById('total-tokens').textContent = '0';
+  document.getElementById('last-latency').textContent = '—';
+}
+
+// ── Documents ────────────────────────────────────────────────────
+async function uploadDocument() {
+  const title    = document.getElementById('doc-title').value.trim();
+  const category = document.getElementById('doc-category').value;
+  const desc     = document.getElementById('doc-description').value.trim();
+  const fileEl   = document.getElementById('doc-file');
+
+  if (!title || !fileEl.files[0]) { alert('Judul dan file wajib diisi.'); return; }
+
+  const form = new FormData();
+  form.append('title', title);
+  form.append('category', category);
+  if (desc) form.append('description', desc);
+  form.append('file', fileEl.files[0]);
+
+  showResponse('doc-response', 0, { status: 'Uploading & indexing...', note: 'Indexing berjalan di background.' });
+  const { status, data } = await apiFetch('POST', '/api/v1/documents/upload', form, true);
+  showResponse('doc-response', status, data);
+  if (status === 201) listDocuments();
+}
+
+async function listDocuments() {
+  const { status, data } = await apiFetch('GET', '/api/v1/documents/');
+  const container = document.getElementById('doc-list');
+  if (status === 200 && Array.isArray(data)) {
+    if (data.length === 0) {
+      container.textContent = 'Belum ada dokumen yang terindeks.';
+      return;
+    }
+    const statusColor = { indexed: 'var(--green)', pending: 'var(--yellow)', processing: 'var(--accent)', failed: 'var(--red)' };
+    container.innerHTML = data.map(d => `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start;">
+        <div style="flex:1;">
+          <div style="color:var(--text-bright);margin-bottom:3px;">${d.title}</div>
+          <div style="color:var(--text-dim);font-size:11px;">${d.category} · ${d.file_name} · ${d.file_type}</div>
+        </div>
+        <div style="color:${statusColor[d.indexing_status]||'var(--text-dim)'};font-size:11px;flex-shrink:0;">
+          ● ${d.indexing_status}
+        </div>
+      </div>
+    `).join('');
+  } else {
+    container.textContent = `Error ${status}: ${JSON.stringify(data)}`;
+  }
+}
+
+// ── Tickets ───────────────────────────────────────────────────────
+async function createTicket() {
+  const body = {
+    title:       document.getElementById('ticket-title').value,
+    description: document.getElementById('ticket-desc').value,
+    category:    document.getElementById('ticket-category').value,
+    priority:    document.getElementById('ticket-priority').value,
+  };
+  if (!body.title || !body.description) { alert('Judul dan deskripsi wajib diisi.'); return; }
+  const { status, data } = await apiFetch('POST', '/api/v1/tickets/', body);
+  showResponse('ticket-response', status, data);
+}
+
+async function listTickets() {
+  const status_f   = document.getElementById('filter-status').value;
+  const priority_f = document.getElementById('filter-priority').value;
+  let path = '/api/v1/tickets/?';
+  if (status_f)   path += `status=${status_f}&`;
+  if (priority_f) path += `priority=${priority_f}&`;
+  const { status, data } = await apiFetch('GET', path);
+  showResponse('ticket-list-response', status, data);
+}
+
+// ── Profile ───────────────────────────────────────────────────────
+async function getMyProfile() {
+  const { status, data } = await apiFetch('GET', '/api/v1/profiles/me');
+  showResponse('profile-response', status, data);
+}
+</script>
+</body>
+</html>
