@@ -29,7 +29,10 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${API_URL}/api/v1/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({ email, password }),
       });
 
@@ -47,7 +50,10 @@ export default function LoginPage() {
       storage.setItem("dm_email", data.email);
 
       const profileRes = await fetch(`${API_URL}/api/v1/profiles/me`, {
-        headers: { Authorization: `Bearer ${data.access_token}` },
+        headers: { 
+          Authorization: `Bearer ${data.access_token}`,
+          "ngrok-skip-browser-warning": "true"
+        },
       });
       const profile = await profileRes.json();
       storage.setItem("dm_role", profile.role || "employee");

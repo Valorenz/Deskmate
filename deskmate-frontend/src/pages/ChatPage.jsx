@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { logout, getAvatarUrl } from '../utils/auth';
+import { logout, getAvatarUrl, apiFetch } from '../utils/auth';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -186,19 +186,15 @@ export default function ChatPage() {
 
     try {
       // 1. Fetch Sesi Percakapan
-      const sessionRes = await fetch(`${API_URL}/api/v1/chat/sessions`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (sessionRes.ok) {
+      const sessionRes = await apiFetch("/api/v1/chat/sessions");
+      if (sessionRes && sessionRes.ok) {
         const sessionData = await sessionRes.json();
         setSessions(sessionData);
       }
 
       // 2. Fetch Tiket Aktif
-      const ticketRes = await fetch(`${API_URL}/api/v1/tickets/?status=open&size=5`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (ticketRes.ok) {
+      const ticketRes = await apiFetch("/api/v1/tickets/?status=open&size=5");
+      if (ticketRes && ticketRes.ok) {
         const ticketData = await ticketRes.json();
         setTickets(ticketData.items || []);
       }
@@ -277,12 +273,11 @@ export default function ChatPage() {
     if (!confirm("Apakah Tuan Muda yakin ingin menghapus riwayat percakapan ini?")) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/chat/sessions/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await apiFetch(`/api/v1/chat/sessions/${id}`, {
+        method: 'DELETE'
       });
 
-      if (res.ok || res.status === 204) {
+      if (res && (res.ok || res.status === 204)) {
         setSessions((prev) => prev.filter((s) => s.id !== id));
         setPinnedSessions((prev) => prev.filter((sid) => sid !== id));
 
@@ -327,10 +322,8 @@ export default function ChatPage() {
     handleRemoveImage();
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/chat/sessions/${id}/messages`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
+      const res = await apiFetch(`/api/v1/chat/sessions/${id}/messages`);
+      if (res && res.ok) {
         const data = await res.json();
         const formattedMessages = data.map((msg) => ({
           role: msg.role === 'assistant' ? 'ai' : 'user',
@@ -375,16 +368,12 @@ export default function ChatPage() {
       let currentSessionId = sessionId;
 
       if (!currentSessionId) {
-        const sessionRes = await fetch(`${API_URL}/api/v1/chat/sessions`, {
+        const sessionRes = await apiFetch("/api/v1/chat/sessions", {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
           body: JSON.stringify({ title: userText ? userText.substring(0, 40) : 'Eskalasi Gambar' })
         });
 
-        if (!sessionRes.ok) throw new Error('Gagal membuat sesi baru.');
+        if (!sessionRes || !sessionRes.ok) throw new Error('Gagal membuat sesi baru.');
         const sessionData = await sessionRes.json();
         currentSessionId = sessionData.id;
         setSessionId(currentSessionId);
@@ -394,22 +383,21 @@ export default function ChatPage() {
       const formData = new FormData();
       formData.append('content', userText);
 
-      let targetUrl = `${API_URL}/api/v1/chat/sessions/${currentSessionId}/messages`;
+      let targetPath = `/api/v1/chat/sessions/${currentSessionId}/messages`;
 
       if (selectedImage) {
         formData.append('image', selectedImage);
-        targetUrl += '/with-image';
+        targetPath += '/with-image';
       } else {
         formData.append('attachment_ids', '[]');
       }
 
-      const messageRes = await fetch(targetUrl, {
+      const messageRes = await apiFetch(targetPath, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
 
-      if (!messageRes.ok) throw new Error('Gagal mengirim pesan ke AI.');
+      if (!messageRes || !messageRes.ok) throw new Error('Gagal mengirim pesan ke AI.');
       const messageData = await messageRes.json();
 
       setMessages((prev) => [...prev, { role: 'ai', content: messageData.ai_message.content, image: null }]);

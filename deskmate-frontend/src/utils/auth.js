@@ -46,6 +46,7 @@ export function logout() {
 export async function apiFetch(path, options = {}) {
   const token = getToken();
   const headers = {
+    "ngrok-skip-browser-warning": "true",
     ...(options.headers || {}),
   };
 
